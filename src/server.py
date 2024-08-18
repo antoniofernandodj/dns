@@ -9,7 +9,7 @@ class DnsServer:
     def __init__(self):  
         self.handlers = {}
 
-    def handle_query(self, qtype):
+    def query(self, qtype):
         def decorator(callback):
             print('Updating handler for qtype:', qtype)
             self.handlers[qtype] = callback
@@ -29,15 +29,12 @@ class DnsServer:
             if not isinstance(question, DNSQuestion):
                 raise TypeError
 
-            qname: DNSLabel = question.qname
-            qtype: int = question.qtype
-
-            handler = self.handlers.get(qtype)
+            handler = self.handlers.get(question.qtype)
             if handler is None:
                 response.header.rcode = 4
                 continue
 
-            handler(qname, response)
+            handler(question.qname, response)
 
         server_socket.sendto(response.pack(), addr)
 

@@ -34,19 +34,19 @@ def resolve_externally(
 
 
 # Handler para registros do tipo 'A' (Endereço IPv4)
-@app.handle_query(QTYPE.A)
+@app.query(QTYPE.A)
 def handle_a_query(qname: DNSLabel, record: DNSRecord) -> None:
     with engine.connect() as connection:
         repository = A_RegisterRepository(connection)
-        qname_str = str(qname)
+
         print(f"Processing query for: {qname_str}")
-        a_register = repository.get_by_hostname(qname_str)
+        a_register = repository.get_by_hostname(str(qname))
         if a_register:
             print(f'Item {a_register} locally found!')
             record.add_answer(a_register.to_rr(ttl=60))
             return None
 
-        answers = resolve_externally(qname_str, 'A')
+        answers = resolve_externally(str(qname), 'A')
         if answers:
             answer = answers[0]
 
@@ -59,7 +59,7 @@ def handle_a_query(qname: DNSLabel, record: DNSRecord) -> None:
 
 
 # Handler para registros do tipo 'MX' (Mail Exchange)
-@app.handle_query(QTYPE.MX)
+@app.query(QTYPE.MX)
 def handle_mx_query(qname: DNSLabel, record: DNSRecord):
     with engine.connect() as connection:
         repository = MX_RegisterRepository(connection)
