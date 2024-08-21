@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Antonio Fernando <antoniofernandodj@outlook.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -11,6 +12,9 @@ dnslib = "^0.9.25"
 dnspython = "^2.6.1"
 sqlalchemy = "^2.0.32"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.2"
 
 [build-system]
 requires = ["poetry-core"]
