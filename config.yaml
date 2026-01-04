@@ -1,0 +1,50 @@
+# config.yaml
+
+server:
+  host: "0.0.0.0"
+  port: 5353
+  workers: 4
+
+database:
+  url: "sqlite+aiosqlite:///dns_server.db"
+  pool_size: 20
+  max_overflow: 40
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false
+
+dns:
+  upstream_servers:
+    - "8.8.8.8"      # Google DNS
+    - "1.1.1.1"      # Cloudflare DNS
+    - "8.8.4.4"      # Google DNS Secondary
+  timeout: 5.0
+  retries: 2
+
+cache:
+  max_size: 10000
+  cleanup_interval: 60
+  default_ttl: 300
+
+rate_limit:
+  enabled: true
+  max_requests: 100
+  window_seconds: 60
+  block_duration: 300
+
+security:
+  max_query_size: 512
+  validate_dnssec: true
+  blocked_qtypes:
+    - "ANY"
+
+circuit_breaker:
+  enabled: true
+  failure_threshold: 5
+  timeout_duration: 60
+  half_open_max_calls: 3
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null  # ou "/var/log/dns-server.log"

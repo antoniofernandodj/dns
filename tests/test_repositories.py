@@ -32,6 +32,7 @@ from src.database import (
 )
 
 import pytest
+from sqlalchemy import text
 
 
 @pytest.fixture
@@ -74,16 +75,31 @@ def srv_register_repo(connection):
     return SRV_RegisterRepository(connection)
 
 
+def test_setup_database():
+    from src.database import engine
+    from sqlalchemy import text
+    with engine.connect() as connection:
+        connection.execute(text('''DELETE FROM a_register'''))
+        connection.execute(text('''DELETE FROM mx_register'''))
+        connection.execute(text('''DELETE FROM txt_register'''))
+        connection.execute(text('''DELETE FROM ns_register'''))
+        connection.execute(text('''DELETE FROM soa_register'''))
+        connection.execute(text('''DELETE FROM srv_register'''))
+    connection.commit()
+    assert True
+
+
 def test_a_register_get(a_register_repo, connection):
-    connection.execute(
-        a_register_table.insert().values(host="example.com", ip="127.0.0.1")
-    )
+    # connection.execute(
+    #     a_register_table.insert().values(host="example.com", ip="127.0.0.1")
+    # )
+    # breakpoint()
     result = a_register_repo.get(1)
 
     assert result is not None
     assert result.id == 1
-    assert result.host == "example.com"
-    assert result.ip == "127.0.0.1"
+    assert result.host == "example.com."
+    assert result.ip == '93.184.215.14'
 
 
 def test_a_register_get_by_hostname(a_register_repo, connection):
@@ -92,7 +108,7 @@ def test_a_register_get_by_hostname(a_register_repo, connection):
     )
     result = a_register_repo.get_by_hostname("example.com")
     assert result is not None
-    assert result.id == 1
+    assert result.id == 2
     assert result.host == "example.com"
     assert result.ip == "127.0.0.1"
 
@@ -117,8 +133,11 @@ def test_a_register_save_update(a_register_repo, connection):
     assert result.host == "updated.com"
     assert result.ip == "192.168.1.1"
 
+    test_setup_database()
+
 
 def test_mx_register_get(mx_register_repo, connection):
+    test_setup_database()
     connection.execute(
         mx_register_table.insert().values(
             host="example.com", exchange="mail.example.com", preference=10

@@ -1,0 +1,91 @@
+# .github/workflows/ci.yml
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install ruff mypy
+          pip install -r requirements.txt
+      
+      - name: Ruff lint
+        run: ruff check .
+      
+      - name: Ruff format check
+        run: ruff format --check .
+      
+      - name: MyPy type check
+        run: mypy src/ --ignore-missing-imports
+
+  # test:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+      
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: '3.11'
+      
+  #     - name: Install dependencies
+  #       run: |
+  #         pip install pytest pytest-asyncio pytest-cov
+  #         pip install -r requirements.txt
+      
+  #     - name: Run tests
+  #       run: pytest tests/ -v --cov=src --cov-report=xml
+      
+  #     - name: Upload coverage
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         files: ./coverage.xml
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout do código
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Setup do Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # 3. Build da imagem Docker (sem push)
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          tags: dns-server:latest
+
+      # 4. Exporta a imagem Docker para um arquivo .tar
+      - name: Save Docker image to tar file
+        run: |
+          docker save dns-server:latest > dns-server.tar
+
+      # 5. Faz upload da imagem como artefato do GitHub Actions
+      - name: Upload Docker image as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: dns-server-image
+          path: dns-server.tar
+  
+

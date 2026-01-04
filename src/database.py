@@ -1,4 +1,9 @@
-from typing import Optional
+# src/database.py
+
+import logging
+from sqlalchemy.ext.asyncio.session import AsyncSession
+from typing import AsyncGenerator
+from src.config import DatabaseConfig
 from src.models import (
     A_Register,
     MX_Register,
@@ -9,104 +14,207 @@ from src.models import (
     SOA_Register,
     SRV_Register,
 )
-
-from sqlalchemy.sql import select
-from sqlalchemy.engine.base import Connection
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    async_sessionmaker,
+    AsyncSession,
+    create_async_engine
+)
+from sqlalchemy.orm import registry
+from contextlib import asynccontextmanager, suppress
 from sqlalchemy.sql.schema import Table, Column, MetaData
 from sqlalchemy.types import Integer, String
-from sqlalchemy.engine import create_engine
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import registry
+from sqlalchemy.exc import ArgumentError
+from src.config import load_config
+
+
+config = load_config().database
 
 metadata = MetaData()
 
-engine = create_engine("sqlite:///example.db", echo=False)
+engine = create_async_engine(
+    config.url,
+    echo=config.echo,
+    pool_size=config.pool_size,
+    max_overflow=config.max_overflow,
+    pool_timeout=config.pool_timeout,
+    pool_recycle=config.pool_recycle,
+    pool_pre_ping=True,
+)
 
 a_register_table = Table(
     "a_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100)),
-    Column("ip", String(100)),
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100)),
+    Column[str]("ip", String(100)),
 )
 
 mx_register_table = Table(
     "mx_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100), nullable=False),
-    Column("exchange", String(100), nullable=False),
-    Column("preference", Integer, nullable=False),
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100), nullable=False),
+    Column[str]("exchange", String(100), nullable=False),
+    Column[int]("preference", Integer, nullable=False),
 )
 
 aaaa_register_table = Table(
     "aaaa_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100)),
-    Column("ip", String(100)),
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100)),
+    Column[str]("ip", String(100)),
 )
 
 cname_register_table = Table(
     "cname_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100)),
-    Column("canonical_name", String(100)),
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100)),
+    Column[str]("canonical_name", String(100)),
 )
 
 txt_register_table = Table(
     "txt_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100)),
-    Column("text", String(255)),  # Considera que o texto pode ser mais longo
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100)),
+    Column[str]("text", String(255)),  # Considera que o texto pode ser mais longo
 )
 
 ns_register_table = Table(
     "ns_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100)),
-    Column("nameserver", String(100)),
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100)),
+    Column[str]("nameserver", String(100)),
 )
 
 soa_register_table = Table(
     "soa_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100)),
-    Column("mname", String(100)),  # Master Name Server
-    Column("rname", String(100)),  # Responsible Person
-    Column("serial", Integer),  # Serial Number
-    Column("refresh", Integer),  # Refresh Interval
-    Column("retry", Integer),  # Retry Interval
-    Column("expire", Integer),  # Expiry Limit
-    Column("minimum", Integer),  # Minimum TTL
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100)),
+    Column[str]("mname", String(100)),  # Master Name Server
+    Column[str]("rname", String(100)),  # Responsible Person
+    Column[int]("serial", Integer),  # Serial Number
+    Column[int]("refresh", Integer),  # Refresh Interval
+    Column[int]("retry", Integer),  # Retry Interval
+    Column[int]("expire", Integer),  # Expiry Limit
+    Column[int]("minimum", Integer),  # Minimum TTL
 )
 
 srv_register_table = Table(
     "srv_register",
     metadata,
-    Column("id", Integer, primary_key=True),
-    Column("host", String(100)),
-    Column("target", String(100)),  # Target Host
-    Column("port", Integer),  # Port Number
-    Column("weight", Integer),  # Weight
-    Column("priority", Integer),  # Priority
+    Column[int]("id", Integer, primary_key=True),
+    Column[str]("host", String(100)),
+    Column[str]("target", String(100)),  # Target Host
+    Column[int]("port", Integer),  # Port Number
+    Column[int]("weight", Integer),  # Weight
+    Column[int]("priority", Integer),  # Priority
 )
 
 
-def init_mappers():
-    mapper_registry = registry()
-    metadata.create_all(bind=engine)
 
-    mapper_registry.map_imperatively(A_Register, a_register_table)
-    mapper_registry.map_imperatively(MX_Register, mx_register_table)
 
-    mapper_registry.map_imperatively(AAAA_Register, aaaa_register_table)
-    mapper_registry.map_imperatively(CNAME_Register, cname_register_table)
-    mapper_registry.map_imperatively(TXT_Register, txt_register_table)
-    mapper_registry.map_imperatively(NS_Register, ns_register_table)
-    mapper_registry.map_imperatively(SOA_Register, soa_register_table)
-    mapper_registry.map_imperatively(SRV_Register, srv_register_table)
+
+
+class AsyncDatabase:
+    """Gerenciador de banco de dados assíncrono"""
+
+    @property
+    def logger(self):
+        return logging.getLogger('AsyncDatabase.' + __name__)
+
+    def __init__(self, config: DatabaseConfig):
+        self.mapper_registry = registry()
+        self.config = config
+        self.engine = create_async_engine(
+            config.url,
+            echo=config.echo,
+            pool_size=config.pool_size,
+            max_overflow=config.max_overflow,
+            pool_timeout=config.pool_timeout,
+            pool_recycle=config.pool_recycle,
+            pool_pre_ping=True,
+        )
+        self.async_session_maker = async_sessionmaker[AsyncSession](
+            self.engine, class_=AsyncSession, expire_on_commit=False
+        )
+
+    async def init_db(self):
+        """Inicializa o banco de dados"""
+
+        self.mapper_registry.map_imperatively(A_Register, a_register_table)
+        self.mapper_registry.map_imperatively(MX_Register, mx_register_table)
+        self.mapper_registry.map_imperatively(AAAA_Register, aaaa_register_table)
+        self.mapper_registry.map_imperatively(CNAME_Register, cname_register_table)
+        self.mapper_registry.map_imperatively(TXT_Register, txt_register_table)
+        self.mapper_registry.map_imperatively(NS_Register, ns_register_table)
+        self.mapper_registry.map_imperatively(SOA_Register, soa_register_table)
+        self.mapper_registry.map_imperatively(SRV_Register, srv_register_table)
+
+        async with engine.begin() as conn:
+            await conn.run_sync(metadata.create_all)
+
+        self.logger.info("Database initialized")
+
+    async def close(self):
+        """Fecha conexões do banco"""
+        await self.engine.dispose()
+        self.logger.info("Database connections closed")
+
+    @asynccontextmanager
+    async def session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Context manager para sessões"""
+        async with self.async_session_maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+
+    @asynccontextmanager
+    async def session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Context manager para sessões"""
+        async with self.async_session_maker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+    @asynccontextmanager
+    async def repository_factory(self):
+        """Context manager para sessões"""
+        from src.repositories.repository_factory import RepositoryFactory
+        async with self.async_session_maker() as session:
+            try:
+                factory = RepositoryFactory(session)
+                yield factory
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+    def get_pool_status():
+        sync_pool = engine.sync_engine.pool
+        return {
+            "size": sync_pool.size(),
+            "checked_in": sync_pool.checkedin(),
+            "checked_out": sync_pool.checkedout(),
+            "overflow": sync_pool.overflow(),
+            "total": sync_pool.size() + sync_pool.overflow(),
+        }

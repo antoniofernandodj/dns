@@ -1,0 +1,28 @@
+services:
+  dns-server:
+    build: .
+    container_name: dns-server
+    ports:
+      - "5353:5353/udp"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - dns-data:/data
+    environment:
+      - DNS_HOST=0.0.0.0
+      - DNS_PORT=5353
+      - DATABASE_URL=sqlite+aiosqlite:////data/dns_server.db
+    restart: unless-stopped
+    networks:
+      - dns-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  dns-data:
+
+networks:
+  dns-network:
+    driver: bridge
