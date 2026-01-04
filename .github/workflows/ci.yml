@@ -83,7 +83,7 @@ jobs:
 
       # 5. Faz upload da imagem como artefato do GitHub Actions
       - name: Upload Docker image as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dns-server-image
           path: dns-server.tar
