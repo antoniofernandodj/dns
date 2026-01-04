@@ -74,20 +74,20 @@ jobs:
         with:
           context: .
           push: false
-          load: true
+          # load: true
           tags: dns-server:latest
     
 
-      # 4. Exporta a imagem Docker para um arquivo .tar
-      - name: Save Docker image to tar file
-        run: |
-          docker save dns-server:latest > dns-server.tar
+      # # 4. Exporta a imagem Docker para um arquivo .tar
+      # - name: Save Docker image to tar file
+      #   run: |
+      #     docker save dns-server:latest > dns-server.tar
 
-      # 5. Faz upload da imagem como artefato do GitHub Actions
-      - name: Upload Docker image as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dns-server-image
-          path: dns-server.tar
+      # # 5. Faz upload da imagem como artefato do GitHub Actions
+      # - name: Upload Docker image as artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: dns-server-image
+      #     path: dns-server.tar
   
 
