@@ -187,13 +187,3 @@ class AsyncDatabase:
                 raise
             finally:
                 await session.close()
-
-    def get_pool_status(self):
-        sync_pool = engine.sync_engine.pool
-        return {
-            "size": sync_pool.size(),
-            "checked_in": sync_pool.checkedin(),
-            "checked_out": sync_pool.checkedout(),
-            "overflow": sync_pool.overflow(),
-            "total": sync_pool.size() + sync_pool.overflow(),
-        }

@@ -61,7 +61,7 @@ class LRUCache(Generic[K, V]):
             entry["data"].ttl = self._remaining_ttl(entry)
             return entry["data"]
 
-    async def set(self, qname: str, qtype: int, data: V, ttl: int) -> None:
+    async def set(self, qname: str, qtype: int, data: Any, ttl: int) -> None:
         """Adiciona item ao cache"""
         key = self._make_key(qname, qtype)
 

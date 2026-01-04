@@ -268,13 +268,14 @@ class DNSServer:
 
     def __init__(
         self,
-        host: str = "127.0.0.1",
-        port: int = 53,
-        max_requests_per_minute: int = 100,
-        cache_cleanup_interval: int = 60,
+        host: str,
+        port: int,
+        max_requests_per_minute: int,
+        cache_cleanup_interval: int,
     ):
         self.host = host
         self.port = port
+        self.s = (self.host, self.port)
         self.handlers: dict[int, Callable] = {}
 
         # Componentes de segurança e cache
@@ -392,7 +393,7 @@ class DNSServer:
         """
         Inicia o servidor DNS e escuta indefinidamente.
         """
-        logging.info(f"Starting DNS server on {self.host}:{self.port}")
+        logging.info(f"Starting DNS server on {self.s}")
 
         # Inicia tarefas de limpeza
         self.cache.start_cleanup()
@@ -400,11 +401,15 @@ class DNSServer:
         # Cria socket UDP
         loop = asyncio.get_running_loop()
 
-        transport, protocol = await loop.create_datagram_endpoint(
-            lambda: DNSProtocol(self), local_addr=(self.host, self.port)
+        transport, protocol = (
+            await loop.create_datagram_endpoint(
+                self.create_protocol,
+                local_addr=self.s
+            )
         )
 
-        logging.info(f"DNS server running on {self.host}:{self.port}")
+        logging.info(f"DNS server running on {self.s}")
+        logging.info(f"Protocol: {protocol}")
         logging.info(f"Cache cleanup interval: {self.cache_cleanup_interval}s")
         logging.info(
             f"Rate limit: {self.rate_limiter.max_requests} "
@@ -417,23 +422,28 @@ class DNSServer:
             logging.info("Shutting down DNS server...")
         finally:
             transport.close()
+    
+    def create_protocol(self):
+
+        class DNSProtocol(asyncio.DatagramProtocol):
+            """
+            Protocolo UDP responsável por receber datagramas DNS
+            e delegar o processamento ao DNSServer.
+            """
+
+            def __init__(self, server: "DNSServer"):
+                self.server = server
+                self.transport: asyncio.DatagramTransport | None = None
+
+            def connection_made(self, transport: asyncio.BaseTransport) -> None:
+                self.transport = transport  # type: ignore
+
+            def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+                """Recebe datagram e cria task assíncrona para processar"""
+                asyncio.create_task(
+                    self.server.handle_request(data, addr, self.transport)  # type: ignore
+                )
+
+        return DNSProtocol(self)
 
 
-class DNSProtocol(asyncio.DatagramProtocol):
-    """
-    Protocolo UDP responsável por receber datagramas DNS
-    e delegar o processamento ao DNSServer.
-    """
-
-    def __init__(self, server: "DNSServer"):
-        self.server = server
-        self.transport: asyncio.DatagramTransport | None = None
-
-    def connection_made(self, transport: asyncio.BaseTransport) -> None:
-        self.transport = transport  # type: ignore
-
-    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        """Recebe datagram e cria task assíncrona para processar"""
-        asyncio.create_task(
-            self.server.handle_request(data, addr, self.transport)  # type: ignore
-        )

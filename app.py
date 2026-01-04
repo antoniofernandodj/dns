@@ -14,13 +14,14 @@ import asyncio
 import logging
 import sys
 from traceback import print_exc
+from typing import Any, Dict
 
 from dnslib import AAAA, CNAME, MX, NS, QTYPE, RR, SOA, SRV, TXT, A, DNSLabel, DNSRecord
 
 from consts import LONG_TTL, MEDIUM_TTL, TTL, DNSResolutionStatus
 
 # Imports do projeto original
-from src.async_dns_resolver import AsyncDNSResolver
+from src.async_dns_resolver import AsyncDNSResolver, QTypeLiteral
 from src.cache_lru import LRUCache
 from src.circuit_breaker import CircuitBreaker
 from src.config import AppConfig, load_config
@@ -250,7 +251,7 @@ class DatabaseBackedDNSServer(DNSServer):
         :param ttl: TTL aplicado ao registro
         :return: True se a resolução foi bem-sucedida
         """
-        qtype_map = {
+        qtype_map: Dict[Any, QTypeLiteral] = {
             QTYPE.A: "A",
             QTYPE.AAAA: "AAAA",
             QTYPE.MX: "MX",
@@ -399,7 +400,7 @@ class DatabaseBackedDNSServer(DNSServer):
 
                     if rr:
                         response.add_answer(rr)
-                        await self.cache.set(qname_str, qtype, rr, ttl)
+                        await self.cache.set(qname=qname_str, qtype=qtype, data=rr, ttl=ttl)
                         logging.info(f"Saved to DB: {qname_str} ({qtype})")
 
         except Exception as e:
