@@ -39,6 +39,7 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+exclude = ["tests/**"]
 
 [tool.mypy]
 python_version = "3.11"
