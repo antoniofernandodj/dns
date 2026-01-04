@@ -3,16 +3,6 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models import (
-    A_Register,
-    AAAA_Register,
-    CNAME_Register,
-    MX_Register,
-    NS_Register,
-    SOA_Register,
-    SRV_Register,
-    TXT_Register,
-)
 from src.repositories import (
     A_RegisterRepository,
     AAAA_RegisterRepository,

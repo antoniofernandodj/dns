@@ -1,5 +1,4 @@
 # import pytest
-from dnslib import DNSLabel, DNSRecord
 
 
 from src.database import engine
