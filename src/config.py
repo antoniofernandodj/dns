@@ -81,5 +81,8 @@ class AppConfig(BaseModel):
         return cls(**data)
 
 
+config = AppConfig | None
 def load_config(path: str = "config.yaml") -> AppConfig:
-    return AppConfig.from_yaml(path)
+    global config
+    config = AppConfig.from_yaml(path)
+    return config
