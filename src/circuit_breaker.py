@@ -111,7 +111,8 @@ class CircuitBreaker:
 
             if self._state == CircuitState.HALF_OPEN:
                 logger.warning(
-                    f"Circuit breaker [{self.name}]: Failure in HALF_OPEN, opening circuit"
+                    f"Circuit breaker [{self.name}]: "
+                    "Failure in HALF_OPEN, opening circuit"
                 )
                 self._state = CircuitState.OPEN
                 return

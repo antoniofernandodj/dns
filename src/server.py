@@ -407,7 +407,8 @@ class DNSServer:
         logging.info(f"DNS server running on {self.host}:{self.port}")
         logging.info(f"Cache cleanup interval: {self.cache_cleanup_interval}s")
         logging.info(
-            f"Rate limit: {self.rate_limiter.max_requests} requests per {self.rate_limiter.window_seconds}s"
+            f"Rate limit: {self.rate_limiter.max_requests} "
+            f"requests per {self.rate_limiter.window_seconds}s"
         )
 
         try:

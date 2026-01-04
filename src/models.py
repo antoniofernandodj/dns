@@ -202,7 +202,8 @@ class A_Register(Base):
         ------------------------------------
         Este método é chamado principalmente quando:
 
-        1. O servidor recebe uma resposta de um DNS upstream (ex: Google DNS, Cloudflare)
+        1. O servidor recebe uma resposta de um DNS upstream
+            (ex: Google DNS, Cloudflare)
         2. A biblioteca dnslib entrega essa resposta como um objeto RR
         3. O servidor decide:
             "Este dado é válido, então vou cachear e persistir"

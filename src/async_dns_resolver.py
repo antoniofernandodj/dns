@@ -102,7 +102,8 @@ class AsyncDNSResolver:
 
         except Exception as e:
             logger.error(
-                f"Unexpected error resolving {qname} ({qtype}): {type(e).__name__} - {e}"
+                "Unexpected error resolving "
+                f"{qname} ({qtype}): {type(e).__name__} - {e}"
             )
             return None, DNSResolutionStatus.UNKNOWN_ERROR
 
