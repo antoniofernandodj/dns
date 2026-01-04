@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import CNAME_Register
-from src.repositories._base import BaseRepository
+from . import BaseRepository
 
 
 class CNAME_RegisterRepository(BaseRepository[CNAME_Register]):

@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import MX_Register
-from src.repositories._base import BaseRepository
+from . import BaseRepository
 
 
 class MX_RegisterRepository(BaseRepository[MX_Register]):

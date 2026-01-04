@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import A_Register
-from src.repositories._base import BaseRepository
+from . import BaseRepository
 
 
 class A_RegisterRepository(BaseRepository[A_Register]):
