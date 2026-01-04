@@ -14,27 +14,29 @@ import asyncio
 import logging
 import sys
 from traceback import print_exc
-from typing import Optional, List
-from dnslib import DNSLabel, DNSRecord, RR, A, AAAA, MX, CNAME, TXT, NS, SOA, SRV, QTYPE
+
+from dnslib import AAAA, CNAME, MX, NS, QTYPE, RR, SOA, SRV, TXT, A, DNSLabel, DNSRecord
+
+from consts import LONG_TTL, MEDIUM_TTL, TTL, DNSResolutionStatus
 
 # Imports do projeto original
+from src.async_dns_resolver import AsyncDNSResolver
 from src.cache_lru import LRUCache
 from src.circuit_breaker import CircuitBreaker
-from src.dns_sec_validator import DNSSECValidator
 from src.config import AppConfig, load_config
-from consts import TTL, MEDIUM_TTL, LONG_TTL, DNSResolutionStatus
-from src.server import DNSServer
 from src.database import AsyncDatabase
+from src.dns_sec_validator import DNSSECValidator
 from src.models import (
     A_Register,
     AAAA_Register,
-    MX_Register,
     CNAME_Register,
-    TXT_Register,
+    MX_Register,
     NS_Register,
     SOA_Register,
     SRV_Register,
+    TXT_Register,
 )
+from src.server import DNSServer
 
 
 # Configuração de logging
@@ -72,7 +74,7 @@ class DatabaseBackedDNSServer(DNSServer):
     Hierarquia de resolução:
         Cache → Banco de Dados → DNS Externo
     """
-    
+
     def __init__(
         self,
         host: str,
@@ -108,11 +110,11 @@ class DatabaseBackedDNSServer(DNSServer):
         self.circuit_breaker = circuit_breaker
         self.dnssec_validator = dnssec_validator
         self.db = db
-    
+
     @property
     def logger(self):
         return setup_logging(self.config)
-    
+
     async def query_with_db(
         self,
         qname_str: str,
@@ -142,26 +144,26 @@ class DatabaseBackedDNSServer(DNSServer):
         if cached_rr:
             response.add_answer(cached_rr)
             return True
-        
+
         # 2. Banco de dados
         db_result = await self._query_database(qname_str, qtype, ttl)
         if db_result:
             for rr in db_result:
                 response.add_answer(rr)
                 await cache.set(qname_str, qtype, rr, ttl)
-            
+
             logging.info(f"DB HIT: {qname_str} ({qtype})")
             return True
-        
+
         # 3. Resolução externa
         return await self._query_external(qname_str, qtype, response, ttl)
-    
+
     async def _query_database(
         self,
         qname_str: str,
         qtype: int,
         ttl: int
-    ) -> Optional[List[RR]]:
+    ) -> list[RR] | None:
         """
         Consulta o banco de dados em busca de registros DNS.
 
@@ -178,31 +180,31 @@ class DatabaseBackedDNSServer(DNSServer):
                 if qtype == QTYPE.A:
                     register = await factory.a_repository.get_by_hostname(qname_str)
                     return [register.to_rr(ttl)] if register else None
-                
+
                 elif qtype == QTYPE.AAAA:
                     register = await factory.aaaa_repository.get_by_hostname(qname_str)
                     return [register.to_rr(ttl)] if register else None
-                
+
                 elif qtype == QTYPE.MX:
                     registers = await factory.mx_repository.get_all_by_hostname(qname_str)
                     return [r.to_rr(ttl) for r in registers] if registers else None
-                
+
                 elif qtype == QTYPE.CNAME:
                     register = await factory.cname_repository.get_by_hostname(qname_str)
                     return [register.to_rr(ttl)] if register else None
-                
+
                 elif qtype == QTYPE.TXT:
                     registers = await factory.txt_repository.get_all_by_hostname(qname_str)
                     return [r.to_rr(ttl) for r in registers] if registers else None
-                
+
                 elif qtype == QTYPE.NS:
                     registers = await factory.ns_repository.get_all_by_hostname(qname_str)
                     return [r.to_rr(ttl) for r in registers] if registers else None
-                
+
                 elif qtype == QTYPE.SOA:
                     register = await factory.soa_repository.get_by_hostname(qname_str)
                     return [register.to_rr(ttl)] if register else None
-                
+
                 elif qtype == QTYPE.SRV:
                     registers = await factory.srv_repository.get_all_by_hostname(qname_str)
                     return [r.to_rr(ttl) for r in registers] if registers else None
@@ -257,36 +259,38 @@ class DatabaseBackedDNSServer(DNSServer):
             QTYPE.SOA: "SOA",
             QTYPE.SRV: "SRV"
         }
-        
+
         qtype_str = qtype_map.get(qtype)
         if not qtype_str:
             return False
-        
+
         # Executa query através do circuit breaker
         async def external_query():
-            from src.async_dns_resolver import (
-                resolve_externally
+            resolver = AsyncDNSResolver(
+                nameservers=self.config.dns.upstream_servers,
+                timeout=5.0,
+                tries=2
             )
-            return await resolve_externally(
-                qname_str,
-                qtype_str,
-                self.config.dns.upstream_servers
+
+            return await resolver.resolve(
+                qname=qname_str,
+                qtype=qtype_str
             )
 
         try:
             answers, status = await self.circuit_breaker.call(external_query)
-            
+
             if status != DNSResolutionStatus.SUCCESS or not answers:
                 self._handle_dns_error(response, status)
                 return False
-            
+
 
             # DNSSEC validation se habilitado
             if self.config.security.validate_dnssec:
                 is_valid, error = await self.dnssec_validator.validate_response(
                     qname_str, qtype_str
                 )
-                                
+
                 if not is_valid:
                     self.logger.warning(f"DNSSEC validation failed for {qname_str}: {error}")
                     response.header.rcode = 2  # SERVFAIL
@@ -294,13 +298,13 @@ class DatabaseBackedDNSServer(DNSServer):
 
             await self._save_to_database(qname_str, qtype, answers, response, ttl)
             return True
-            
+
         except Exception as e:
             print_exc()
             logging.error(f"External query error for {qname_str}: {e}")
             response.header.rcode = 2  # SERVFAIL
             return False
-    
+
 
     async def _save_to_database(
         self,
@@ -320,38 +324,38 @@ class DatabaseBackedDNSServer(DNSServer):
         :param response: Objeto DNSRecord de resposta
         :param ttl: TTL aplicado aos registros
         """
-        
+
         try:
             async with self.db.repository_factory() as factory:
                 for answer in answers:
                     rr = None
                     entity = None
-                    
+
                     if qtype == QTYPE.A:
                         ip = str(answer.address)
                         rr = RR(qname_str, QTYPE.A, ttl=ttl, rdata=A(ip))
                         entity = A_Register.from_rr(rr)
                         await factory.a_repository.save(entity)
-                    
+
                     elif qtype == QTYPE.AAAA:
                         ip = str(answer.address)
                         rr = RR(qname_str, QTYPE.AAAA, ttl=ttl, rdata=AAAA(ip))
                         entity = AAAA_Register.from_rr(rr)
                         await factory.aaaa_repository.save(entity)
-                    
+
                     elif qtype == QTYPE.MX:
                         exchange = str(answer.exchange)
                         pref = int(answer.preference)
                         rr = RR(qname_str, QTYPE.MX, ttl=ttl, rdata=MX(exchange, pref))
                         entity = MX_Register.from_rr(rr)
                         await factory.mx_repository.save(entity)
-                    
+
                     elif qtype == QTYPE.CNAME:
                         cname = str(answer.target)
                         rr = RR(qname_str, QTYPE.CNAME, ttl=ttl, rdata=CNAME(cname))
                         entity = CNAME_Register.from_rr(rr)
                         await factory.cname_repository.save(entity)
-                    
+
                     elif qtype == QTYPE.TXT:
                         txt_parts = [
                             s.decode('utf-8') if isinstance(s, bytes) else str(s)
@@ -361,13 +365,13 @@ class DatabaseBackedDNSServer(DNSServer):
                         rr = RR(qname_str, QTYPE.TXT, ttl=ttl, rdata=TXT(txt))
                         entity = TXT_Register.from_rr(rr)
                         await factory.txt_repository.save(entity)
-                    
+
                     elif qtype == QTYPE.NS:
                         ns = str(answer.target)
                         rr = RR(qname_str, QTYPE.NS, ttl=ttl, rdata=NS(ns))
                         entity = NS_Register.from_rr(rr)
                         await factory.ns_repository.save(entity)
-                    
+
                     elif qtype == QTYPE.SOA:
                         rr = RR(
                             qname_str,
@@ -387,7 +391,7 @@ class DatabaseBackedDNSServer(DNSServer):
                         )
                         entity = SOA_Register.from_rr(rr)
                         await factory.soa_repository.save(entity)
-                    
+
                     elif qtype == QTYPE.SRV:
                         rr = RR(
                             qname_str,
@@ -402,8 +406,8 @@ class DatabaseBackedDNSServer(DNSServer):
                         )
                         entity = SRV_Register.from_rr(rr)
                         await factory.srv_repository.save(entity)
-                            
-            
+
+
                     if rr:
                         response.add_answer(rr)
                         await self.cache.set(qname_str, qtype, rr, ttl)
@@ -411,6 +415,7 @@ class DatabaseBackedDNSServer(DNSServer):
 
         except Exception as e:
             logging.error(f"Failed to save to database: {e}")
+
 
 
 async def main():
@@ -424,6 +429,7 @@ async def main():
     - Registrar handlers por tipo de query
     - Iniciar o servidor DNS
     """
+
     logging.info("Database initialized")
     config = load_config()
     db = AsyncDatabase(config.database)
@@ -437,7 +443,7 @@ async def main():
         half_open_max_calls=config.circuit_breaker.half_open_max_calls,
         name="DNS_External"
     )
-    
+
     dnssec_validator = DNSSECValidator(
         enabled=config.security.validate_dnssec
     )
@@ -453,27 +459,123 @@ async def main():
         db=db
     )
 
-    # Handlers DNS por tipo
-    for qtype, ttl in [
-        (QTYPE.A, TTL),
-        (QTYPE.AAAA, TTL),
-        (QTYPE.MX, MEDIUM_TTL),
-        (QTYPE.CNAME, TTL),
-        (QTYPE.TXT, LONG_TTL),
-        (QTYPE.NS, LONG_TTL),
-        (QTYPE.SOA, LONG_TTL),
-        (QTYPE.SRV, LONG_TTL),
-    ]:
+    @server.query(QTYPE.A)
+    async def handle_a(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.A,
+            response=record,
+            cache=cache,
+            ttl=TTL,
+        )
 
-        @server.query(qtype)
-        async def handler(
-            qname: DNSLabel,
-            record: DNSRecord,
-            cache: LRUCache
-        ):
-            await server.query_with_db(
-                str(qname), qtype, record, cache, ttl
-            )
+    @server.query(QTYPE.AAAA)
+    async def handle_aaaa(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.AAAA,
+            response=record,
+            cache=cache,
+            ttl=TTL,
+        )
+
+    @server.query(QTYPE.MX)
+    async def handle_mx(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.MX,
+            response=record,
+            cache=cache,
+            ttl=MEDIUM_TTL,
+        )
+
+
+    @server.query(QTYPE.CNAME)
+    async def handle_cname(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.CNAME,
+            response=record,
+            cache=cache,
+            ttl=TTL,
+        )
+
+
+    @server.query(QTYPE.TXT)
+    async def handle_txt(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.TXT,
+            response=record,
+            cache=cache,
+            ttl=LONG_TTL,
+        )
+
+
+    @server.query(QTYPE.NS)
+    async def handle_ns(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.NS,
+            response=record,
+            cache=cache,
+            ttl=LONG_TTL,
+        )
+
+
+    @server.query(QTYPE.SOA)
+    async def handle_soa(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.SOA,
+            response=record,
+            cache=cache,
+            ttl=LONG_TTL,
+        )
+
+
+    @server.query(QTYPE.SRV)
+    async def handle_srv(
+        qname: DNSLabel,
+        record: DNSRecord,
+        cache: LRUCache,
+    ):
+        await server.query_with_db(
+            qname_str=str(qname),
+            qtype=QTYPE.SRV,
+            response=record,
+            cache=cache,
+            ttl=LONG_TTL,
+        )
+
 
     logging.info("Starting DNS server with full features:")
     logging.info("  ✓ Async concurrency (asyncio)")
@@ -482,7 +584,7 @@ async def main():
     logging.info("  ✓ Security validation")
     logging.info("  ✓ Database persistence")
     logging.info("  ✓ Complete type hints")
-    
+
     try:
         await server.start()
     except KeyboardInterrupt:

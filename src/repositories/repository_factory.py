@@ -1,9 +1,19 @@
 # src/repositories/repository_factory.py
 
 
-from typing import Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.models import A_Register, AAAA_Register, CNAME_Register, MX_Register, NS_Register, SOA_Register, SRV_Register, TXT_Register
+
+from src.models import (
+    A_Register,
+    AAAA_Register,
+    CNAME_Register,
+    MX_Register,
+    NS_Register,
+    SOA_Register,
+    SRV_Register,
+    TXT_Register,
+)
 from src.repositories.a_register_repository import A_RegisterRepository
 from src.repositories.aaaa_register_repository import AAAA_RegisterRepository
 from src.repositories.cname_register_repository import CNAME_RegisterRepository
@@ -14,25 +24,24 @@ from src.repositories.srv_register_repository import SRV_RegisterRepository
 from src.repositories.txt_register_repository import TXT_RegisterRepository
 
 
-
 # Factory pattern para criar repositórios
 class RepositoryFactory:
     """
     Factory para criar repositórios compartilhando a mesma conexão.
     Evita criar múltiplas instâncias do mesmo repositório.
     """
-    
+
     def __init__(self, session: AsyncSession):
         self._session = session
-        self._a_repository: Optional[A_RegisterRepository[A_Register]] = None
-        self._mx_repository: Optional[MX_RegisterRepository[MX_Register]] = None
-        self._aaaa_repository: Optional[AAAA_RegisterRepository[AAAA_Register]] = None
-        self._cname_repository: Optional[CNAME_RegisterRepository[CNAME_Register]] = None
-        self._txt_repository: Optional[TXT_RegisterRepository[TXT_Register]] = None
-        self._ns_repository: Optional[NS_RegisterRepository[NS_Register]] = None
-        self._soa_repository: Optional[SOA_RegisterRepository[SOA_Register]] = None
-        self._srv_repository: Optional[SRV_RegisterRepository[SRV_Register]] = None
-    
+        self._a_repository: A_RegisterRepository[A_Register] | None = None
+        self._mx_repository: MX_RegisterRepository[MX_Register] | None = None
+        self._aaaa_repository: AAAA_RegisterRepository[AAAA_Register] | None = None
+        self._cname_repository: CNAME_RegisterRepository[CNAME_Register] | None = None
+        self._txt_repository: TXT_RegisterRepository[TXT_Register] | None = None
+        self._ns_repository: NS_RegisterRepository[NS_Register] | None = None
+        self._soa_repository: SOA_RegisterRepository[SOA_Register] | None = None
+        self._srv_repository: SRV_RegisterRepository[SRV_Register] | None = None
+
     @property
     def a_repository(self) -> A_RegisterRepository:
         if self._a_repository is None:

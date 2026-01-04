@@ -8,6 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import pytest
 from sqlalchemy.orm import sessionmaker
+
 from src.database import engine as __engine
 
 

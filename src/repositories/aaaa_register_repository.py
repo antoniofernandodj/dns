@@ -1,6 +1,7 @@
 # src/repositories/aaaa_register_repository.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models import AAAA_Register
 from src.repositories._base import BaseRepository
 

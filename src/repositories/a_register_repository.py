@@ -1,8 +1,9 @@
 # src/repositories/a_register_repository.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.repositories._base import BaseRepository
+
 from src.models import A_Register
+from src.repositories._base import BaseRepository
 
 
 class A_RegisterRepository(BaseRepository[A_Register]):

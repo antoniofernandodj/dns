@@ -1,38 +1,36 @@
-from src.repositories import (
-    A_RegisterRepository,
-    MX_RegisterRepository,
-    AAAA_RegisterRepository,
-    CNAME_RegisterRepository,
-    TXT_RegisterRepository,
-    NS_RegisterRepository,
-    SOA_RegisterRepository,
-    SRV_RegisterRepository,
-)
-
-from src.models import (
-    A_Register,
-    MX_Register,
-    AAAA_Register,
-    CNAME_Register,
-    TXT_Register,
-    NS_Register,
-    SOA_Register,
-    SRV_Register,
-)
+import pytest
+from sqlalchemy import text
 
 from src.database import (
     a_register_table,
-    mx_register_table,
     aaaa_register_table,
     cname_register_table,
-    txt_register_table,
+    mx_register_table,
     ns_register_table,
     soa_register_table,
     srv_register_table,
+    txt_register_table,
 )
-
-import pytest
-from sqlalchemy import text
+from src.models import (
+    A_Register,
+    AAAA_Register,
+    CNAME_Register,
+    MX_Register,
+    NS_Register,
+    SOA_Register,
+    SRV_Register,
+    TXT_Register,
+)
+from src.repositories import (
+    A_RegisterRepository,
+    AAAA_RegisterRepository,
+    CNAME_RegisterRepository,
+    MX_RegisterRepository,
+    NS_RegisterRepository,
+    SOA_RegisterRepository,
+    SRV_RegisterRepository,
+    TXT_RegisterRepository,
+)
 
 
 @pytest.fixture
@@ -77,7 +75,6 @@ def srv_register_repo(connection):
 
 def test_setup_database():
     from src.database import engine
-    from sqlalchemy import text
     with engine.connect() as connection:
         connection.execute(text('''DELETE FROM a_register'''))
         connection.execute(text('''DELETE FROM mx_register'''))

@@ -1,33 +1,29 @@
 # src/database.py
 
 import logging
-from sqlalchemy.ext.asyncio.session import AsyncSession
-from typing import AsyncGenerator
-from src.config import DatabaseConfig
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import registry
+from sqlalchemy.sql.schema import Column, MetaData, Table
+from sqlalchemy.types import Integer, String
+
+from src.config import DatabaseConfig, load_config
 from src.models import (
     A_Register,
-    MX_Register,
     AAAA_Register,
     CNAME_Register,
-    TXT_Register,
+    MX_Register,
     NS_Register,
     SOA_Register,
     SRV_Register,
+    TXT_Register,
 )
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    async_sessionmaker,
-    AsyncSession,
-    create_async_engine
-)
-from sqlalchemy.orm import registry
-from contextlib import asynccontextmanager, suppress
-from sqlalchemy.sql.schema import Table, Column, MetaData
-from sqlalchemy.types import Integer, String
-from sqlalchemy.orm import registry
-from sqlalchemy.exc import ArgumentError
-from src.config import load_config
-
 
 config = load_config().database
 
@@ -166,20 +162,6 @@ class AsyncDatabase:
         """Fecha conexões do banco"""
         await self.engine.dispose()
         self.logger.info("Database connections closed")
-
-    @asynccontextmanager
-    async def session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Context manager para sessões"""
-        async with self.async_session_maker() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
-
 
     @asynccontextmanager
     async def session(self) -> AsyncGenerator[AsyncSession, None]:

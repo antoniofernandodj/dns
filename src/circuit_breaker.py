@@ -1,11 +1,12 @@
 # src/circuit_breaker.py
 
 import asyncio
-import time
-from enum import Enum
-from typing import Callable, Any
-from dataclasses import dataclass, field
 import logging
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ class CircuitBreaker:
             await self._on_success()
             return result
 
-        except Exception as e:
+        except Exception:
             await self._on_failure()
             raise
 

@@ -1,16 +1,15 @@
+from dnslib import AAAA, CNAME, MX, NS, QTYPE, RR, SOA, SRV, TXT, A
+
 from src.models import (
     A_Register,
-    MX_Register,
     AAAA_Register,
     CNAME_Register,
-    TXT_Register,
+    MX_Register,
     NS_Register,
     SOA_Register,
     SRV_Register,
+    TXT_Register,
 )
-
-
-from dnslib import RR, A, MX, AAAA, CNAME, TXT, NS, SOA, SRV, QTYPE
 
 
 def test_a_register_to_rr():

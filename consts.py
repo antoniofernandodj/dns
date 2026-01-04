@@ -1,6 +1,5 @@
 from enum import Enum
 
-
 GOOGLE_DNS = "8.8.8.8"
 CLOUDFLARE_DNS = "1.0.0.1"
 TTL = 60

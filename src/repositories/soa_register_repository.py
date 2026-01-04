@@ -1,6 +1,7 @@
 # src/repositories/soa_register_repository.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.models import SOA_Register
 from src.repositories._base import BaseRepository
 

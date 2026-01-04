@@ -1,9 +1,9 @@
 # src/config.py
 
-from pydantic import BaseModel, Field
-from typing import List, Optional
-import yaml
 from pathlib import Path
+
+import yaml
+from pydantic import BaseModel, Field
 
 
 class DatabaseConfig(BaseModel):
@@ -16,7 +16,7 @@ class DatabaseConfig(BaseModel):
 
 
 class DNSConfig(BaseModel):
-    upstream_servers: List[str]
+    upstream_servers: list[str]
     timeout: float
     retries: int
 
@@ -37,7 +37,7 @@ class RateLimitConfig(BaseModel):
 class SecurityConfig(BaseModel):
     max_query_size: int
     validate_dnssec: bool
-    blocked_qtypes: List[str]
+    blocked_qtypes: list[str]
 
 
 class CircuitBreakerConfig(BaseModel):
@@ -56,7 +56,7 @@ class ServerConfig(BaseModel):
 class LoggingConfig(BaseModel):
     level: str
     format: str
-    file: Optional[str]
+    file: str | None
 
 
 class AppConfig(BaseModel):
@@ -77,7 +77,7 @@ class AppConfig(BaseModel):
         if not config_path.exists():
             raise FileNotFoundError(f"Config file not found: {path}")
 
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             data = yaml.safe_load(f)
 
         return cls(**data)

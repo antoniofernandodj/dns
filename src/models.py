@@ -20,18 +20,18 @@ Esses modelos cumprem três papéis fundamentais:
 # )
 
 
-from typing import Optional, List, Tuple
+
 from dnslib import (
-    RR,
-    A,
-    QTYPE,
-    MX,
-    SOA,
-    TXT,
     AAAA,
     CNAME,
+    MX,
     NS,
+    QTYPE,
+    RR,
+    SOA,
     SRV,
+    TXT,
+    A,
 )
 
 
@@ -48,13 +48,13 @@ class Base:
     2. Servir como camada intermediária entre banco de dados e protocolo DNS
     3. Converter dados persistidos em Resource Records reais (dnslib.RR)
     """
-    
+
     # ID interno (normalmente usado para persistência em banco)
-    id: Optional[int]
+    id: int | None
 
     # Nome do host ao qual o registro pertence (ex: "example.com.")
     host: str
-    
+
     def set_id(self, new_id: int) -> None:
         """
         Define o ID interno do registro.
@@ -63,7 +63,7 @@ class Base:
         Ele existe apenas para controle interno/persistência.
         """
         self.id = new_id
-    
+
     def __repr__(self) -> str:
         """
         Representação textual do objeto, útil para debug e logs.
@@ -90,12 +90,12 @@ class A_Register(Base):
     - Pode ser o alvo final de um CNAME
     - Pode ser usado como destino de um SRV ou MX
     """
-    
-    def __init__(self, _id: Optional[int], _host: str, _ip: str) -> None:
+
+    def __init__(self, _id: int | None, _host: str, _ip: str) -> None:
         self.id = _id
         self.host = _host
         self.ip = _ip
-    
+
     def to_rr(self, ttl: int) -> RR:
         """
         Constrói um Resource Record (RR) DNS do tipo A a partir do modelo interno.
@@ -178,7 +178,7 @@ class A_Register(Base):
         se transforma em uma resposta DNS real, válida e interoperável.
         """
         return RR(self.host, QTYPE.A, ttl=ttl, rdata=A(self.ip))
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "A_Register":
         """
@@ -279,8 +279,8 @@ class A_Register(Base):
         respostas externas e reutilizá-las como se fossem dados locais.
         """
         return cls(_id=None, _host=str(rr.rname) if rr.rname else "", _ip=str(rr.rdata))
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         """
         Valida semanticamente o registro A.
 
@@ -293,18 +293,18 @@ class A_Register(Base):
             return False, "Host cannot be empty"
         if not self.ip:
             return False, "IP cannot be empty"
-        
+
         # Validação simples de IPv4 (não depende de libs externas)
         parts = self.ip.split('.')
         if len(parts) != 4:
             return False, "Invalid IPv4 format"
-        
+
         try:
             if not all(0 <= int(part) <= 255 for part in parts):
                 return False, "Invalid IPv4 octets"
         except ValueError:
             return False, "Invalid IPv4 format"
-        
+
         return True, ""
 
 
@@ -319,16 +319,16 @@ class AAAA_Register(Base):
     INTERAÇÃO:
     - Normalmente consultado em conjunto com A (dual-stack)
     - Pode coexistir com A para o mesmo host
-    """    
-    def __init__(self, _id: Optional[int], _host: str, _ip: str) -> None:
+    """
+    def __init__(self, _id: int | None, _host: str, _ip: str) -> None:
         self.id = _id
         self.host = _host
         self.ip = _ip
-    
+
     def to_rr(self, ttl: int) -> RR:
         """Converte para Resource Record da dnslib"""
         return RR(self.host, QTYPE.AAAA, ttl=ttl, rdata=AAAA(self.ip))
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "AAAA_Register":
         """Cria instância a partir de Resource Record"""
@@ -337,18 +337,18 @@ class AAAA_Register(Base):
             _host=str(rr.rname) if rr.rname else "",
             _ip=str(rr.rdata)
         )
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         # Validação básica: IPv6 sempre contém ':'
         if not self.host:
             return False, "Host cannot be empty"
         if not self.ip:
             return False, "IP cannot be empty"
-        
+
         # Validação básica de IPv6 (aceita formato comprimido)
         if ':' not in self.ip:
             return False, "Invalid IPv6 format"
-        
+
         return True, ""
 
 
@@ -368,10 +368,10 @@ class MX_Register(Base):
     - Aponta para hosts que geralmente possuem registros A/AAAA
     - O campo preference define prioridade (menor = mais preferido)
     """
-    
+
     def __init__(
         self,
-        _id: Optional[int],
+        _id: int | None,
         _host: str,
         _exchange: str,
         _preference: int
@@ -380,7 +380,7 @@ class MX_Register(Base):
         self.host = _host
         self.exchange = _exchange
         self.preference = _preference
-    
+
     def to_rr(self, ttl: int) -> RR:
         """Converte para Resource Record da dnslib"""
         return RR(
@@ -389,7 +389,7 @@ class MX_Register(Base):
             ttl=ttl,
             rdata=MX(label=self.exchange, preference=self.preference),
         )
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "MX_Register":
         """Cria instância a partir de Resource Record"""
@@ -399,8 +399,8 @@ class MX_Register(Base):
             _exchange=str(rr.rdata.label),  # type: ignore
             _preference=int(rr.rdata.preference),  # type: ignore
         )
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         """Valida os dados do registro"""
         if not self.host:
             return False, "Host cannot be empty"
@@ -408,7 +408,7 @@ class MX_Register(Base):
             return False, "Exchange cannot be empty"
         if self.preference < 0 or self.preference > 65535:
             return False, "Preference must be between 0 and 65535"
-        
+
         return True, ""
 
 
@@ -426,17 +426,17 @@ class CNAME_Register(Base):
     REGRAS IMPORTANTES:
     - Um CNAME NÃO pode coexistir com outros registros no mesmo nome
     - A resolução continua até chegar em um registro final (A/AAAA/etc.)
-    """    
+    """
     def __init__(
         self,
-        _id: Optional[int],
+        _id: int | None,
         _host: str,
         _canonical_name: str
     ) -> None:
         self.id = _id
         self.host = _host
         self.canonical_name = _canonical_name
-    
+
     def to_rr(self, ttl: int) -> RR:
         """Converte para Resource Record da dnslib"""
         return RR(
@@ -445,7 +445,7 @@ class CNAME_Register(Base):
             ttl=ttl,
             rdata=CNAME(self.canonical_name)
         )
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "CNAME_Register":
         """Cria instância a partir de Resource Record"""
@@ -454,14 +454,14 @@ class CNAME_Register(Base):
             _host=str(rr.rname) if rr.rname else "",
             _canonical_name=str(rr.rdata.label)  # type: ignore
         )
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         """Valida os dados do registro"""
         if not self.host:
             return False, "Host cannot be empty"
         if not self.canonical_name:
             return False, "Canonical name cannot be empty"
-        
+
         return True, ""
 
 
@@ -486,12 +486,12 @@ class TXT_Register(Base):
     INTERAÇÃO:
     - Normalmente consumido por aplicações, não por usuários finais
     - Pode coexistir com praticamente qualquer outro tipo de registro
-    """    
-    def __init__(self, _id: Optional[int], _host: str, _text: str) -> None:
+    """
+    def __init__(self, _id: int | None, _host: str, _text: str) -> None:
         self.id = _id
         self.host = _host
         self.text = _text
-    
+
     def to_rr(self, ttl: int) -> RR:
         """
         Converte o TXT interno em um Resource Record DNS.
@@ -500,7 +500,7 @@ class TXT_Register(Base):
         de até 255 bytes, mas a biblioteca dnslib abstrai isso.
         """
         return RR(self.host, QTYPE.TXT, ttl=ttl, rdata=TXT(self.text))
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "TXT_Register":
         """
@@ -511,22 +511,22 @@ class TXT_Register(Base):
         - O resolver precisa recompor o texto completo
         """
         # TXT pode ter múltiplas strings
-        text_parts: List[str] = []
+        text_parts: list[str] = []
         for part in rr.rdata.data:  # type: ignore
             if isinstance(part, bytes):
                 text_parts.append(part.decode("utf-8"))
             else:
                 text_parts.append(str(part))
-        
+
         text = "".join(text_parts)
-        
+
         return cls(
             _id=None,
             _host=str(rr.rname) if rr.rname else "",
             _text=text
         )
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         """
         Validação semântica do registro TXT.
 
@@ -539,7 +539,7 @@ class TXT_Register(Base):
             return False, "Text cannot be empty"
         if len(self.text) > 65535:  # Limite prático para TXT
             return False, "Text too long (max 65535 chars)"
-        
+
         return True, ""
 
 
@@ -560,21 +560,21 @@ class NS_Register(Base):
     - Normalmente acompanhado de registros A/AAAA (glue records)
     - Usado por resolvers para descobrir quem responde pela zona
     """
-    
+
     def __init__(
         self,
-        _id: Optional[int],
+        _id: int | None,
         _host: str,
         _nameserver: str
     ) -> None:
         self.id = _id
         self.host = _host
         self.nameserver = _nameserver
-    
+
     def to_rr(self, ttl: int) -> RR:
         """Converte para Resource Record da dnslib"""
         return RR(self.host, QTYPE.NS, ttl=ttl, rdata=NS(self.nameserver))
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "NS_Register":
         """Cria instância a partir de Resource Record"""
@@ -583,14 +583,14 @@ class NS_Register(Base):
             _host=str(rr.rname) if rr.rname else "",
             _nameserver=str(rr.rdata.label)  # type: ignore
         )
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         """Valida os dados do registro"""
         if not self.host:
             return False, "Host cannot be empty"
         if not self.nameserver:
             return False, "Nameserver cannot be empty"
-        
+
         return True, ""
 
 
@@ -622,10 +622,10 @@ class SOA_Register(Base):
     - Trabalha junto com NS
     - Essencial para servidores autoritativos
     """
-    
+
     def __init__(
         self,
-        _id: Optional[int],
+        _id: int | None,
         _host: str,
         _mname: str,
         _rname: str,
@@ -644,7 +644,7 @@ class SOA_Register(Base):
         self.retry = _retry
         self.expire = _expire
         self.minimum = _minimum
-    
+
     def to_rr(self, ttl: int) -> RR:
         """Converte para Resource Record da dnslib"""
         return RR(
@@ -663,13 +663,13 @@ class SOA_Register(Base):
                 ),
             ),
         )
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "SOA_Register":
         """Cria instância a partir de Resource Record"""
         rdata = rr.rdata
         serial, refresh, retry, expire, minimum = rdata.times  # type: ignore
-        
+
         return cls(
             _id=None,
             _host=str(rr.rname) if rr.rname else "",
@@ -681,8 +681,8 @@ class SOA_Register(Base):
             _expire=int(expire),
             _minimum=int(minimum),
         )
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         """Valida os dados do registro"""
         if not self.host:
             return False, "Host cannot be empty"
@@ -690,7 +690,7 @@ class SOA_Register(Base):
             return False, "Master name server cannot be empty"
         if not self.rname:
             return False, "Responsible person cannot be empty"
-        
+
         # Validações dos timers
         if self.serial < 0:
             return False, "Serial must be non-negative"
@@ -702,7 +702,7 @@ class SOA_Register(Base):
             return False, "Expire must be non-negative"
         if self.minimum < 0:
             return False, "Minimum must be non-negative"
-        
+
         return True, ""
 
 
@@ -730,10 +730,10 @@ class SRV_Register(Base):
     - Usado por clientes, não por browsers
     - Normalmente seguido por lookup A/AAAA do target
     """
-    
+
     def __init__(
         self,
-        _id: Optional[int],
+        _id: int | None,
         _host: str,
         _target: str,
         _port: int,
@@ -746,7 +746,7 @@ class SRV_Register(Base):
         self.port = _port
         self.weight = _weight
         self.priority = _priority
-    
+
     def to_rr(self, ttl: int) -> RR:
         """Converte para Resource Record da dnslib"""
         return RR(
@@ -760,7 +760,7 @@ class SRV_Register(Base):
                 priority=self.priority,
             ),
         )
-    
+
     @classmethod
     def from_rr(cls, rr: RR) -> "SRV_Register":
         """Cria instância a partir de Resource Record"""
@@ -772,14 +772,14 @@ class SRV_Register(Base):
             _weight=int(rr.rdata.weight),  # type: ignore
             _priority=int(rr.rdata.priority),  # type: ignore
         )
-    
-    def validate(self) -> Tuple[bool, str]:
+
+    def validate(self) -> tuple[bool, str]:
         """Valida os dados do registro"""
         if not self.host:
             return False, "Host cannot be empty"
         if not self.target:
             return False, "Target cannot be empty"
-        
+
         # Validações dos campos numéricos
         if self.port < 0 or self.port > 65535:
             return False, "Port must be between 0 and 65535"
@@ -787,5 +787,5 @@ class SRV_Register(Base):
             return False, "Weight must be between 0 and 65535"
         if self.priority < 0 or self.priority > 65535:
             return False, "Priority must be between 0 and 65535"
-        
+
         return True, ""

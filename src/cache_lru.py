@@ -1,15 +1,19 @@
 # src/cache_lru.py
 
-from collections import OrderedDict
 import asyncio
-import time
-from typing import Iterable, Optional, Dict
 import logging
+import time
+from collections import OrderedDict
+from collections.abc import Iterable
+from typing import Generic, TypeVar
 
 logger = logging.getLogger(__name__)
 
 
-class LRUCache[K, V]:
+K = TypeVar('K')
+V = TypeVar('V')
+
+class LRUCache(Generic[K, V]):
     """
     Cache LRU com limite de tamanho e expiração por TTL
     """
@@ -19,7 +23,7 @@ class LRUCache[K, V]:
         self.cleanup_interval = cleanup_interval
         self._cache: OrderedDict = OrderedDict[K, V]()
         self._lock = asyncio.Lock()
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
         self.stats = {"hits": 0, "misses": 0, "evictions": 0, "expirations": 0}
 
     def _make_key(self, qname: str, qtype: int) -> str:
@@ -29,7 +33,7 @@ class LRUCache[K, V]:
     def capacity(self):
         return self.max_size
 
-    async def get(self, qname: str, qtype: int, key: Optional[K] = None) -> Optional[V]:
+    async def get(self, qname: str, qtype: int, key: K | None = None) -> V | None:
         """Busca item no cache (LRU)"""
         if key is None:
             key = self._make_key(qname, qtype)
@@ -79,12 +83,12 @@ class LRUCache[K, V]:
                 "created_at": time.time(),
             }
 
-    def _is_expired(self, entry: Dict) -> bool:
+    def _is_expired(self, entry: dict) -> bool:
         """Verifica se entrada expirou"""
         age = time.time() - entry["created_at"]
         return age > entry["ttl"]
 
-    def _remaining_ttl(self, entry: Dict) -> int:
+    def _remaining_ttl(self, entry: dict) -> int:
         """Calcula TTL restante"""
         age = int(time.time() - entry["created_at"])
         remaining = entry["ttl"] - age
@@ -118,7 +122,7 @@ class LRUCache[K, V]:
             await asyncio.sleep(self.cleanup_interval)
             await self.cleanup_expired()
 
-    def get_stats(self) -> Dict[str, V]:
+    def get_stats(self) -> dict[str, V]:
         """Retorna estatísticas"""
         total = self.stats["hits"] + self.stats["misses"]
         hit_rate = (self.stats["hits"] / total * 100) if total > 0 else 0
