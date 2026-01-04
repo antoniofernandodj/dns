@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import AAAA_Register
+
 from . import BaseRepository
 
 
