@@ -136,6 +136,9 @@ class DNSSECValidator:
 
                 # 3. Valida RRSIG com DNSKEY (self-signed)
                 try:
+                    if not dnskey_rrset:
+                        raise ValueError('`dnskey_rrset` is None')
+
                     # Encontra a KSK (Key Signing Key - flags=257)
                     ksk_keys = [
                         key
@@ -150,8 +153,10 @@ class DNSSECValidator:
                     # Valida a assinatura
                     dns.dnssec.validate(
                         dnskey_rrset,
-                        {current_name: dnskey_rrset},  # Use DNSKEY to validate itself
-                        None,  # No timestamp validation
+                        # Use DNSKEY to validate itself 
+                        {current_name: dnskey_rrset},  # type: ignore
+                        # No timestamp validation  
+                        None,  # type: ignore
                         None,
                     )
 
@@ -166,25 +171,25 @@ class DNSSECValidator:
                     # parent_name = current_name.parent()
 
                     try:
-                        ds_rrset = self.resolver.resolve(
-                            current_name, dns.rdatatype.DS
-                        ).rrset
-
                         # Verifica que algum DS corresponde a alguma DNSKEY
                         ds_matched = False
-                        for ds in ds_rrset:
-                            for dnskey in dnskey_rrset:
-                                # Calcula hash da DNSKEY
-                                calculated_ds = dns.dnssec.make_ds(
-                                    current_name, dnskey, ds.digest_type
-                                )
+                        args = (current_name, dns.rdatatype.DS)
+                        if (ds_rrset := self.resolver.resolve(*args).rrset):
+                            for ds in ds_rrset:
+                                if not dnskey_rrset:
+                                    continue
 
-                                if calculated_ds.digest == ds.digest:
-                                    ds_matched = True
-                                    logger.debug(
-                                        f"DS record matches DNSKEY for {zone_str}"
+                                for dnskey in dnskey_rrset:  # type: ignore
+                                    # Calcula hash da DNSKEY
+                                    calculated_ds = dns.dnssec.make_ds(
+                                        current_name, dnskey, ds.digest_type
                                     )
-                                    break
+                                    if calculated_ds.digest == ds.digest:
+                                        ds_matched = True
+                                        logger.debug(
+                                            f"DS record matches DNSKEY for {zone_str}"
+                                        )
+                                        break
 
                             if ds_matched:
                                 break
@@ -226,16 +231,17 @@ class DNSSECValidator:
             ).rrset
 
             # Verifica se alguma DNSKEY corresponde ao trust anchor
-            for dnskey in dnskey_rrset:
-                dnskey_str = dnskey.to_text()
+            if dnskey_rrset:
+                for dnskey in dnskey_rrset:
+                    dnskey_str = dnskey.to_text()
 
-                for anchor in self.root_trust_anchors:
-                    # Remove ". IN DNSKEY " do anchor para comparar
-                    anchor_key = " ".join(anchor.split()[3:])
+                    for anchor in self.root_trust_anchors:
+                        # Remove ". IN DNSKEY " do anchor para comparar
+                        anchor_key = " ".join(anchor.split()[3:])
 
-                    if anchor_key in dnskey_str:
-                        logger.debug("Root DNSKEY matches trust anchor")
-                        return True
+                        if anchor_key in dnskey_str:
+                            logger.debug("Root DNSKEY matches trust anchor")
+                            return True
 
             logger.error("Root DNSKEY does not match any trust anchor")
             return False

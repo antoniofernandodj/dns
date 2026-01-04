@@ -60,14 +60,14 @@ class LoggingConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    server: ServerConfig = Field(default_factory=ServerConfig)
-    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
-    dns: DNSConfig = Field(default_factory=DNSConfig)
-    cache: CacheConfig = Field(default_factory=CacheConfig)
-    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
-    security: SecurityConfig = Field(default_factory=SecurityConfig)
-    circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    server: ServerConfig
+    database: DatabaseConfig
+    dns: DNSConfig
+    cache: CacheConfig
+    rate_limit: RateLimitConfig
+    security: SecurityConfig
+    circuit_breaker: CircuitBreakerConfig
+    logging: LoggingConfig
 
     @classmethod
     def from_yaml(cls, path: str) -> "AppConfig":

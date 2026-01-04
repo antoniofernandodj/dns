@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from dnslib import QTYPE, RR, DNSQuestion, DNSRecord  # , DNSLabel
 
@@ -275,10 +275,10 @@ class DNSServer:
     ):
         self.host = host
         self.port = port
-        self.handlers: dict[int, Any] = {}
+        self.handlers: dict[int, Callable] = {}
 
         # Componentes de segurança e cache
-        self.cache = LRUCache(
+        self.cache = LRUCache[str, int](
             max_size=load_config().cache.max_size,
             cleanup_interval=load_config().cache.cleanup_interval,
         )

@@ -5,7 +5,7 @@ import logging
 import time
 from collections import OrderedDict
 from collections.abc import Iterable
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class LRUCache(Generic[K, V]):
     def capacity(self):
         return self.max_size
 
-    async def get(self, qname: str, qtype: int, key: K | None = None) -> V | None:
+    async def get(self, qname: str, qtype: int, key: str | None = None) -> Any | None:
         """Busca item no cache (LRU)"""
         if key is None:
             key = self._make_key(qname, qtype)
@@ -86,13 +86,13 @@ class LRUCache(Generic[K, V]):
 
     def _is_expired(self, entry: dict) -> bool:
         """Verifica se entrada expirou"""
-        age = time.time() - entry["created_at"]
-        return age > entry["ttl"]
+        age = int(time.time() - entry["created_at"])
+        return age > int(entry["ttl"])
 
     def _remaining_ttl(self, entry: dict) -> int:
         """Calcula TTL restante"""
         age = int(time.time() - entry["created_at"])
-        remaining = entry["ttl"] - age
+        remaining = int(entry["ttl"]) - age
         return max(0, remaining)
 
     async def cleanup_expired(self) -> int:
@@ -121,7 +121,7 @@ class LRUCache(Generic[K, V]):
             await asyncio.sleep(self.cleanup_interval)
             await self.cleanup_expired()
 
-    def get_stats(self) -> dict[str, V]:
+    def get_stats(self) -> dict[str, Any]:
         """Retorna estatísticas"""
         total = self.stats["hits"] + self.stats["misses"]
         hit_rate = (self.stats["hits"] / total * 100) if total > 0 else 0
@@ -145,7 +145,7 @@ class LRUCache(Generic[K, V]):
 
         # Marca como recentemente usado
         self._cache.move_to_end(key)
-        return self._cache[key]
+        return cast(V, self._cache[key])
 
     def __setitem__(self, key: K, value: V) -> None:
         if key in self._cache:

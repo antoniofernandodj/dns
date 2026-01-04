@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Literal
 
 import aiodns
 
@@ -10,6 +11,7 @@ from consts import DNSResolutionStatus
 
 logger = logging.getLogger(__name__)
 
+QTypeLiteral = Literal["A", "AAAA", "MX", "CNAME", "TXT", "NS", "SOA", "SRV"]
 
 @dataclass
 class DNSAnswer:
@@ -58,7 +60,7 @@ class AsyncDNSResolver:
         )
 
     async def resolve(
-        self, qname: str, qtype: str
+        self, qname: str, qtype: QTypeLiteral
     ) -> tuple[list[DNSAnswer] | None, DNSResolutionStatus]:
         """
         Resolve query DNS de forma assíncrona
@@ -107,7 +109,7 @@ class AsyncDNSResolver:
             )
             return None, DNSResolutionStatus.UNKNOWN_ERROR
 
-    def _get_resolver_method(self, qtype: str):
+    def _get_resolver_method(self, qtype: QTypeLiteral):
         """Retorna o método apropriado do aiodns para o tipo de query"""
         methods = {
             "A": self.resolver.query,

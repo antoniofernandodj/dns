@@ -48,4 +48,4 @@ class BaseRepository(ABC, Generic[Model]):
     async def save(self, register: Model) -> None:
         await self.session.merge(register)
         await self.session.flush()
-        print(f"[REPO] Register {register.id} updated")
+        print(f"[REPO] Register {getattr(register, 'id')} updated")

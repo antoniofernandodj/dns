@@ -188,7 +188,7 @@ class AsyncDatabase:
             finally:
                 await session.close()
 
-    def get_pool_status():
+    def get_pool_status(self):
         sync_pool = engine.sync_engine.pool
         return {
             "size": sync_pool.size(),

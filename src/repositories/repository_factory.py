@@ -34,14 +34,14 @@ class RepositoryFactory:
 
     def __init__(self, session: AsyncSession):
         self._session = session
-        self._a_repository: A_RegisterRepository[A_Register] | None = None
-        self._mx_repository: MX_RegisterRepository[MX_Register] | None = None
-        self._aaaa_repository: AAAA_RegisterRepository[AAAA_Register] | None = None
-        self._cname_repository: CNAME_RegisterRepository[CNAME_Register] | None = None
-        self._txt_repository: TXT_RegisterRepository[TXT_Register] | None = None
-        self._ns_repository: NS_RegisterRepository[NS_Register] | None = None
-        self._soa_repository: SOA_RegisterRepository[SOA_Register] | None = None
-        self._srv_repository: SRV_RegisterRepository[SRV_Register] | None = None
+        self._a_repository: A_RegisterRepository | None = None
+        self._mx_repository: MX_RegisterRepository | None = None
+        self._aaaa_repository: AAAA_RegisterRepository | None = None
+        self._cname_repository: CNAME_RegisterRepository | None = None
+        self._txt_repository: TXT_RegisterRepository | None = None
+        self._ns_repository: NS_RegisterRepository | None = None
+        self._soa_repository: SOA_RegisterRepository | None = None
+        self._srv_repository: SRV_RegisterRepository | None = None
 
     @property
     def a_repository(self) -> A_RegisterRepository:

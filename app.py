@@ -320,32 +320,31 @@ class DatabaseBackedDNSServer(DNSServer):
             async with self.db.repository_factory() as factory:
                 for answer in answers:
                     rr = None
-                    entity = None
 
                     if qtype == QTYPE.A:
                         ip = str(answer.address)
                         rr = RR(qname_str, QTYPE.A, ttl=ttl, rdata=A(ip))
-                        entity = A_Register.from_rr(rr)
-                        await factory.a_repository.save(entity)
+                        e1 = A_Register.from_rr(rr)
+                        await factory.a_repository.save(e1)
 
                     elif qtype == QTYPE.AAAA:
                         ip = str(answer.address)
                         rr = RR(qname_str, QTYPE.AAAA, ttl=ttl, rdata=AAAA(ip))
-                        entity = AAAA_Register.from_rr(rr)
-                        await factory.aaaa_repository.save(entity)
+                        e2 = AAAA_Register.from_rr(rr)
+                        await factory.aaaa_repository.save(e2)
 
                     elif qtype == QTYPE.MX:
                         exchange = str(answer.exchange)
                         pref = int(answer.preference)
                         rr = RR(qname_str, QTYPE.MX, ttl=ttl, rdata=MX(exchange, pref))
-                        entity = MX_Register.from_rr(rr)
-                        await factory.mx_repository.save(entity)
+                        e3 = MX_Register.from_rr(rr)
+                        await factory.mx_repository.save(e3)
 
                     elif qtype == QTYPE.CNAME:
                         cname = str(answer.target)
                         rr = RR(qname_str, QTYPE.CNAME, ttl=ttl, rdata=CNAME(cname))
-                        entity = CNAME_Register.from_rr(rr)
-                        await factory.cname_repository.save(entity)
+                        e4 = CNAME_Register.from_rr(rr)
+                        await factory.cname_repository.save(e4)
 
                     elif qtype == QTYPE.TXT:
                         txt_parts = [
@@ -354,14 +353,14 @@ class DatabaseBackedDNSServer(DNSServer):
                         ]
                         txt = "".join(txt_parts)
                         rr = RR(qname_str, QTYPE.TXT, ttl=ttl, rdata=TXT(txt))
-                        entity = TXT_Register.from_rr(rr)
-                        await factory.txt_repository.save(entity)
+                        e5 = TXT_Register.from_rr(rr)
+                        await factory.txt_repository.save(e5)
 
                     elif qtype == QTYPE.NS:
                         ns = str(answer.target)
                         rr = RR(qname_str, QTYPE.NS, ttl=ttl, rdata=NS(ns))
-                        entity = NS_Register.from_rr(rr)
-                        await factory.ns_repository.save(entity)
+                        e6 = NS_Register.from_rr(rr)
+                        await factory.ns_repository.save(e6)
 
                     elif qtype == QTYPE.SOA:
                         rr = RR(
@@ -380,8 +379,8 @@ class DatabaseBackedDNSServer(DNSServer):
                                 ),
                             ),
                         )
-                        entity = SOA_Register.from_rr(rr)
-                        await factory.soa_repository.save(entity)
+                        e7 = SOA_Register.from_rr(rr)
+                        await factory.soa_repository.save(e7)
 
                     elif qtype == QTYPE.SRV:
                         rr = RR(
@@ -395,8 +394,8 @@ class DatabaseBackedDNSServer(DNSServer):
                                 priority=answer.priority,
                             ),
                         )
-                        entity = SRV_Register.from_rr(rr)
-                        await factory.srv_repository.save(entity)
+                        e8 = SRV_Register.from_rr(rr)
+                        await factory.srv_repository.save(e8)
 
                     if rr:
                         response.add_answer(rr)
