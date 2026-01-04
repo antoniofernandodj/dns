@@ -10,8 +10,9 @@ from typing import Generic, TypeVar
 logger = logging.getLogger(__name__)
 
 
-K = TypeVar('K')
-V = TypeVar('V')
+K = TypeVar("K")
+V = TypeVar("V")
+
 
 class LRUCache(Generic[K, V]):
     """
@@ -98,9 +99,7 @@ class LRUCache(Generic[K, V]):
         """Remove entradas expiradas"""
         async with self._lock:
             expired_keys = [
-                key
-                for key, entry in self._cache.items()
-                if self._is_expired(entry)
+                key for key, entry in self._cache.items() if self._is_expired(entry)
             ]
 
             for key in expired_keys:

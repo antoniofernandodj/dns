@@ -6,7 +6,9 @@ from typing import Generic, TypeVar
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-Model = TypeVar('Model')
+Model = TypeVar("Model")
+
+
 class BaseRepository(ABC, Generic[Model]):
     """Classe base para repositórios com métodos comuns"""
 
@@ -47,4 +49,3 @@ class BaseRepository(ABC, Generic[Model]):
         await self.session.merge(register)
         await self.session.flush()
         print(f"[REPO] Register {register.id} updated")
-

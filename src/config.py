@@ -66,9 +66,7 @@ class AppConfig(BaseModel):
     cache: CacheConfig = Field(default_factory=CacheConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
-    circuit_breaker: CircuitBreakerConfig = Field(
-        default_factory=CircuitBreakerConfig
-    )
+    circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     @classmethod

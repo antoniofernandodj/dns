@@ -1,7 +1,6 @@
 # src/repositories/repository_factory.py
 
 
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models import (
@@ -92,7 +91,9 @@ class RepositoryFactory:
 
     async def commit(self):
         await self._session.commit()
+
     async def rollback(self):
         await self._session.rollback()
+
     async def close(self):
         await self._session.close()

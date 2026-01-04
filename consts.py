@@ -6,6 +6,7 @@ TTL = 60
 MEDIUM_TTL = 300
 LONG_TTL = 3600
 
+
 class DNSResolutionStatus(Enum):
     SUCCESS = "success"
     NXDOMAIN = "nxdomain"

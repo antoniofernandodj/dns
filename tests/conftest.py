@@ -14,7 +14,6 @@ from src.database import engine as __engine
 
 @pytest.fixture(scope="module")
 async def engine():
-
     return __engine
 
 

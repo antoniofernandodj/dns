@@ -9,7 +9,7 @@ import sys
 import time
 
 # Adiciona o diretório raiz ao path
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 from dnslib import QTYPE, RR, A
 
@@ -20,11 +20,12 @@ from src.cache_lru import LRUCache
 # TESTES DE CACHE COM EXPIRAÇÃO TTL
 # ============================================================================
 
+
 async def test_cache_expiration():
     """Testa expiração automática de cache baseada em TTL"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TESTE 1: Cache com Expiração TTL")
-    print("="*70)
+    print("=" * 70)
 
     cache = LRUCache()
 
@@ -54,7 +55,9 @@ async def test_cache_expiration():
     stats = cache.get_stats()
     assert stats["hits"] == 1, f"❌ Deveria ter 1 hit, mas tem {stats['hits']}"
     assert stats["misses"] == 1, f"❌ Deveria ter 1 miss, mas tem {stats['misses']}"
-    assert stats["expirations"] == 1, f"❌ Deveria ter 1 expiration, mas tem {stats['expirations']}"
+    assert stats["expirations"] == 1, (
+        f"❌ Deveria ter 1 expiration, mas tem {stats['expirations']}"
+    )
     print(f"✅ Estatísticas corretas: {stats}")
 
     print("\n✅ TESTE 1 PASSOU: Cache com expiração funciona corretamente\n")
@@ -62,9 +65,9 @@ async def test_cache_expiration():
 
 async def test_cache_cleanup():
     """Testa limpeza automática de entradas expiradas"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TESTE 2: Limpeza Automática de Cache")
-    print("="*70)
+    print("=" * 70)
 
     cache = LRUCache()
 
@@ -87,7 +90,9 @@ async def test_cache_cleanup():
     print(f"✅ Cleanup removeu {removed} entradas expiradas")
 
     final_count = cache.get_stats()["entries"]
-    assert final_count == 0, f"❌ Cache deveria estar vazio, mas tem {final_count} entradas"
+    assert final_count == 0, (
+        f"❌ Cache deveria estar vazio, mas tem {final_count} entradas"
+    )
     print(f"✅ Cache limpo: {final_count} entradas restantes")
 
     print("\n✅ TESTE 2 PASSOU: Limpeza automática funciona corretamente\n")
@@ -97,11 +102,12 @@ async def test_cache_cleanup():
 # TESTES DE RATE LIMITING
 # ============================================================================
 
+
 async def test_rate_limiting():
     """Testa rate limiting por IP"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TESTE 3: Rate Limiting por IP")
-    print("="*70)
+    print("=" * 70)
 
     # Configuração: máximo 5 requests em 10 segundos
     limiter = RateLimiter(max_requests=5, window_seconds=10, block_duration=5)
@@ -111,7 +117,7 @@ async def test_rate_limiting():
     # Teste 1: Primeiras 5 requisições devem passar
     for i in range(5):
         allowed, msg = limiter.check_rate_limit(client_ip)
-        assert allowed, f"❌ Requisição {i+1} deveria ser permitida: {msg}"
+        assert allowed, f"❌ Requisição {i + 1} deveria ser permitida: {msg}"
     print("✅ Primeiras 5 requisições permitidas")
 
     # Teste 2: 6ª requisição deve ser bloqueada
@@ -122,7 +128,9 @@ async def test_rate_limiting():
 
     # Teste 3: Verifica estatísticas
     stats = limiter.get_stats()
-    assert stats["blocked_clients"] == 1, f"❌ Deveria ter 1 cliente bloqueado, mas tem {stats['blocked_clients']}"
+    assert stats["blocked_clients"] == 1, (
+        f"❌ Deveria ter 1 cliente bloqueado, mas tem {stats['blocked_clients']}"
+    )
     print(f"✅ Estatísticas corretas: {stats}")
 
     # Teste 4: Aguarda desbloqueio
@@ -138,9 +146,9 @@ async def test_rate_limiting():
 
 async def test_rate_limiting_multiple_ips():
     """Testa rate limiting com múltiplos IPs"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TESTE 4: Rate Limiting com Múltiplos IPs")
-    print("="*70)
+    print("=" * 70)
 
     limiter = RateLimiter(max_requests=3, window_seconds=10, block_duration=5)
 
@@ -161,8 +169,12 @@ async def test_rate_limiting_multiple_ips():
     print("✅ Rate limiting isolado por IP funciona corretamente")
 
     stats = limiter.get_stats()
-    assert stats["total_clients"] == 2, f"❌ Deveria ter 2 clientes, mas tem {stats['total_clients']}"
-    assert stats["blocked_clients"] == 1, f"❌ Deveria ter 1 bloqueado, mas tem {stats['blocked_clients']}"
+    assert stats["total_clients"] == 2, (
+        f"❌ Deveria ter 2 clientes, mas tem {stats['total_clients']}"
+    )
+    assert stats["blocked_clients"] == 1, (
+        f"❌ Deveria ter 1 bloqueado, mas tem {stats['blocked_clients']}"
+    )
     print(f"✅ Estatísticas corretas: {stats}")
 
     print("\n✅ TESTE 4 PASSOU: Rate limiting por IP funciona corretamente\n")
@@ -172,11 +184,12 @@ async def test_rate_limiting_multiple_ips():
 # TESTES DE VALIDAÇÃO DE SEGURANÇA
 # ============================================================================
 
+
 def test_security_validation():
     """Testa validação de queries DNS"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TESTE 5: Validação de Segurança")
-    print("="*70)
+    print("=" * 70)
 
     validator = DNSSecurityValidator()
 
@@ -216,7 +229,9 @@ def test_security_validation():
     large_query = b"x" * 600
 
     assert validator.validate_query_size(small_query), "❌ Query pequena deveria passar"
-    assert not validator.validate_query_size(large_query), "❌ Query grande deveria ser rejeitada"
+    assert not validator.validate_query_size(large_query), (
+        "❌ Query grande deveria ser rejeitada"
+    )
     print("✅ Validação de tamanho funciona corretamente")
 
     print("\n✅ TESTE 5 PASSOU: Validação de segurança funciona corretamente\n")
@@ -226,11 +241,12 @@ def test_security_validation():
 # TESTES DE TYPE HINTS
 # ============================================================================
 
+
 def test_type_hints():
     """Verifica se type hints estão presentes nos métodos críticos"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TESTE 6: Verificação de Type Hints")
-    print("="*70)
+    print("=" * 70)
 
     import inspect
 
@@ -246,12 +262,12 @@ def test_type_hints():
     # Verifica LRUCache
     sig = inspect.signature(LRUCache.get)
     # async methods retornam Coroutine, então verificamos isso
-    assert 'return' in str(sig), "❌ LRUCache.get deveria ter annotation"
+    assert "return" in str(sig), "❌ LRUCache.get deveria ter annotation"
     print("✅ LRUCache.get tem type hint")
 
     # Verifica RateLimiter
     sig = inspect.signature(RateLimiter.check_rate_limit)
-    assert 'return' in str(sig), "❌ check_rate_limit deveria ter annotation"
+    assert "return" in str(sig), "❌ check_rate_limit deveria ter annotation"
     print("✅ RateLimiter.check_rate_limit tem type hint")
 
     print("\n✅ TESTE 6 PASSOU: Type hints estão presentes\n")
@@ -261,11 +277,12 @@ def test_type_hints():
 # TESTE DE INTEGRAÇÃO
 # ============================================================================
 
+
 async def test_integration():
     """Teste de integração: cache + rate limiting + validação"""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TESTE 7: Integração Completa")
-    print("="*70)
+    print("=" * 70)
 
     cache = LRUCache()
     limiter = RateLimiter(max_requests=10, window_seconds=60)
@@ -278,7 +295,7 @@ async def test_integration():
     for i in range(5):
         # 1. Rate limiting
         allowed, msg = limiter.check_rate_limit(client_ip)
-        assert allowed, f"❌ Request {i+1} bloqueada indevidamente"
+        assert allowed, f"❌ Request {i + 1} bloqueada indevidamente"
 
         # 2. Validação
         is_valid, msg = validator.validate_domain_name(domain)
@@ -291,17 +308,19 @@ async def test_integration():
             # Primeira vez: adiciona ao cache
             rr = RR(domain, QTYPE.A, ttl=60, rdata=A("93.184.216.34"))
             await cache.set(domain, QTYPE.A, rr, ttl=60)
-            print(f"✅ Request {i+1}: Cache miss → adicionado")
+            print(f"✅ Request {i + 1}: Cache miss → adicionado")
         elif cached is not None and i > 0:
-            print(f"✅ Request {i+1}: Cache hit")
+            print(f"✅ Request {i + 1}: Cache hit")
         else:
-            raise AssertionError(f"❌ Estado inesperado na request {i+1}")
+            raise AssertionError(f"❌ Estado inesperado na request {i + 1}")
 
     # Verifica estatísticas finais
     cache_stats = cache.get_stats()
     limiter_stats = limiter.get_stats()
 
-    assert cache_stats["hits"] >= 4, f"❌ Deveria ter ≥4 cache hits, mas tem {cache_stats['hits']}"
+    assert cache_stats["hits"] >= 4, (
+        f"❌ Deveria ter ≥4 cache hits, mas tem {cache_stats['hits']}"
+    )
     assert limiter_stats["total_clients"] == 1, "❌ Deveria ter 1 cliente"
 
     print(f"✅ Cache stats: {cache_stats}")
@@ -313,6 +332,7 @@ async def test_integration():
 # ============================================================================
 # RUNNER PRINCIPAL
 # ============================================================================
+
 
 async def run_all_tests():
     """Executa todos os testes"""
@@ -336,9 +356,9 @@ async def run_all_tests():
 
         elapsed = time.time() - start_time
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("🎉 TODOS OS TESTES PASSARAM! 🎉")
-        print("="*70)
+        print("=" * 70)
         print("✅ 7 testes executados com sucesso")
         print(f"⏱️  Tempo total: {elapsed:.2f}s")
         print("\nMelhorias validadas:")
@@ -349,7 +369,7 @@ async def run_all_tests():
         print("  ✓ Validação de segurança")
         print("  ✓ Type hints completos")
         print("  ✓ Integração completa")
-        print("="*70 + "\n")
+        print("=" * 70 + "\n")
 
         return True
 
@@ -359,6 +379,7 @@ async def run_all_tests():
     except Exception as e:
         print(f"\n❌ ERRO INESPERADO: {e}\n")
         import traceback
+
         traceback.print_exc()
         return False
 

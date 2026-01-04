@@ -11,21 +11,19 @@ Responsabilidades principais:
 - Utilizar cache LRU com TTL
 """
 
-
 import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from dnslib import QTYPE, RR, DNSQuestion, DNSRecord  #, DNSLabel
+from dnslib import QTYPE, RR, DNSQuestion, DNSRecord  # , DNSLabel
 
 from src.cache_lru import LRUCache
 from src.config import load_config
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 
@@ -39,6 +37,7 @@ class CacheEntry:
     - TTL configurado
     - Timestamp de criação
     """
+
     data: RR
     ttl: int
     created_at: float = field(default_factory=time.time)
@@ -73,6 +72,7 @@ class RateLimitEntry:
     - Janela de tempo
     - Período de bloqueio
     """
+
     request_count: int = 0
     first_request_time: float = field(default_factory=time.time)
     blocked_until: float = 0.0
@@ -135,7 +135,7 @@ class DNSSecurityValidator:
         if len(domain) > DNSSecurityValidator.MAX_DOMAIN_LENGTH:
             return False
 
-        labels = domain.rstrip('.').split('.')
+        labels = domain.rstrip(".").split(".")
         if not labels:
             return False
 
@@ -144,11 +144,11 @@ class DNSSecurityValidator:
                 return False
 
             # Verifica caracteres válidos (alfanuméricos e hífen)
-            if not all(c.isalnum() or c == '-' for c in label):
+            if not all(c.isalnum() or c == "-" for c in label):
                 return False
 
             # Label não pode começar ou terminar com hífen
-            if label.startswith('-') or label.endswith('-'):
+            if label.startswith("-") or label.endswith("-"):
                 return False
 
         return True
@@ -182,8 +182,6 @@ class DNSSecurityValidator:
         return True, ""
 
 
-
-
 class RateLimiter:
     """
     Implementa rate limiting por IP usando sliding window.
@@ -197,14 +195,13 @@ class RateLimiter:
         self,
         max_requests: int = 100,
         window_seconds: int = 60,
-        block_duration: int = 300
+        block_duration: int = 300,
     ):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self.block_duration = block_duration
         self.clients = LRUCache[str, RateLimitEntry]()
         self._cleanup_task: asyncio.Task | None = None
-
 
     def check_rate_limit(self, client_ip: str) -> tuple[bool, str]:
         """
@@ -254,7 +251,7 @@ class RateLimiter:
         return {
             "total_clients": len(self.clients),
             "blocked_clients": blocked,
-            "active_clients": len(self.clients) - blocked
+            "active_clients": len(self.clients) - blocked,
         }
 
 
@@ -268,14 +265,14 @@ class DNSServer:
     - Encaminhar queries para handlers registrados
     - Gerenciar cache e estatísticas
     """
+
     def __init__(
         self,
         host: str = "127.0.0.1",
         port: int = 53,
         max_requests_per_minute: int = 100,
-        cache_cleanup_interval: int = 60
+        cache_cleanup_interval: int = 60,
     ):
-
         self.host = host
         self.port = port
         self.handlers: dict[int, Any] = {}
@@ -283,7 +280,7 @@ class DNSServer:
         # Componentes de segurança e cache
         self.cache = LRUCache(
             max_size=load_config().cache.max_size,
-            cleanup_interval=load_config().cache.cleanup_interval
+            cleanup_interval=load_config().cache.cleanup_interval,
         )
 
         self.rate_limiter = RateLimiter(max_requests=max_requests_per_minute)
@@ -297,18 +294,16 @@ class DNSServer:
 
         :param qtype: Tipo de registro DNS (QTYPE)
         """
+
         def decorator(callback):
             logging.info(f"Registering handler for qtype: {qtype}")
             self.handlers[qtype] = callback
             return callback
+
         return decorator
 
-
     async def handle_request(
-        self,
-        data: bytes,
-        addr: tuple[str, int],
-        transport: asyncio.DatagramTransport
+        self, data: bytes, addr: tuple[str, int], transport: asyncio.DatagramTransport
     ) -> None:
         """
         Processa uma requisição DNS recebida via UDP.
@@ -381,7 +376,9 @@ class DNSServer:
             transport.sendto(response.pack(), addr)
 
         except Exception as e:
-            logging.error(f"Error handling request from {client_ip}: {e}", exc_info=True)
+            logging.error(
+                f"Error handling request from {client_ip}: {e}", exc_info=True
+            )
             try:
                 # Tenta enviar SERVFAIL em caso de erro
                 request = DNSRecord.parse(data)
@@ -404,13 +401,14 @@ class DNSServer:
         loop = asyncio.get_running_loop()
 
         transport, protocol = await loop.create_datagram_endpoint(
-            lambda: DNSProtocol(self),
-            local_addr=(self.host, self.port)
+            lambda: DNSProtocol(self), local_addr=(self.host, self.port)
         )
 
         logging.info(f"DNS server running on {self.host}:{self.port}")
         logging.info(f"Cache cleanup interval: {self.cache_cleanup_interval}s")
-        logging.info(f"Rate limit: {self.rate_limiter.max_requests} requests per {self.rate_limiter.window_seconds}s")
+        logging.info(
+            f"Rate limit: {self.rate_limiter.max_requests} requests per {self.rate_limiter.window_seconds}s"
+        )
 
         try:
             await asyncio.Event().wait()  # Aguarda indefinidamente
@@ -420,14 +418,13 @@ class DNSServer:
             transport.close()
 
 
-
 class DNSProtocol(asyncio.DatagramProtocol):
     """
     Protocolo UDP responsável por receber datagramas DNS
     e delegar o processamento ao DNSServer.
     """
 
-    def __init__(self, server: 'DNSServer'):
+    def __init__(self, server: "DNSServer"):
         self.server = server
         self.transport: asyncio.DatagramTransport | None = None
 

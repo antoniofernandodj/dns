@@ -114,16 +114,12 @@ srv_register_table = Table(
 )
 
 
-
-
-
-
 class AsyncDatabase:
     """Gerenciador de banco de dados assíncrono"""
 
     @property
     def logger(self):
-        return logging.getLogger('AsyncDatabase.' + __name__)
+        return logging.getLogger("AsyncDatabase." + __name__)
 
     def __init__(self, config: DatabaseConfig):
         self.mapper_registry = registry()
@@ -180,6 +176,7 @@ class AsyncDatabase:
     async def repository_factory(self):
         """Context manager para sessões"""
         from src.repositories.repository_factory import RepositoryFactory
+
         async with self.async_session_maker() as session:
             try:
                 factory = RepositoryFactory(session)

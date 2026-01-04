@@ -75,13 +75,14 @@ def srv_register_repo(connection):
 
 def test_setup_database():
     from src.database import engine
+
     with engine.connect() as connection:
-        connection.execute(text('''DELETE FROM a_register'''))
-        connection.execute(text('''DELETE FROM mx_register'''))
-        connection.execute(text('''DELETE FROM txt_register'''))
-        connection.execute(text('''DELETE FROM ns_register'''))
-        connection.execute(text('''DELETE FROM soa_register'''))
-        connection.execute(text('''DELETE FROM srv_register'''))
+        connection.execute(text("""DELETE FROM a_register"""))
+        connection.execute(text("""DELETE FROM mx_register"""))
+        connection.execute(text("""DELETE FROM txt_register"""))
+        connection.execute(text("""DELETE FROM ns_register"""))
+        connection.execute(text("""DELETE FROM soa_register"""))
+        connection.execute(text("""DELETE FROM srv_register"""))
     connection.commit()
     assert True
 
@@ -96,7 +97,7 @@ def test_a_register_get(a_register_repo, connection):
     assert result is not None
     assert result.id == 1
     assert result.host == "example.com."
-    assert result.ip == '93.184.215.14'
+    assert result.ip == "93.184.215.14"
 
 
 def test_a_register_get_by_hostname(a_register_repo, connection):

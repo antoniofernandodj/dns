@@ -8,5 +8,6 @@ from src.repositories._base import BaseRepository
 
 class NS_RegisterRepository(BaseRepository[NS_Register]):
     """Repository para registros NS"""
+
     def __init__(self, session: AsyncSession):
         super().__init__(session, NS_Register)

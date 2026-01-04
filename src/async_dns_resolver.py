@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DNSAnswer:
     """Wrapper para respostas DNS assíncronas"""
+
     host: str
     ttl: int
     priority: int | None = None
@@ -46,27 +47,18 @@ class AsyncDNSResolver:
     Não bloqueia o event loop
     """
 
-    def __init__(
-        self,
-        nameservers: list[str],
-        timeout: float = 5.0,
-        tries: int = 2
-    ):
+    def __init__(self, nameservers: list[str], timeout: float = 5.0, tries: int = 2):
         self.nameservers = nameservers
         self.timeout = timeout
         self.tries = tries
 
         # Cria resolver aiodns
         self.resolver = aiodns.DNSResolver(
-            nameservers=nameservers,
-            timeout=timeout,
-            tries=tries
+            nameservers=nameservers, timeout=timeout, tries=tries
         )
 
     async def resolve(
-        self,
-        qname: str,
-        qtype: str
+        self, qname: str, qtype: str
     ) -> tuple[list[DNSAnswer] | None, DNSResolutionStatus]:
         """
         Resolve query DNS de forma assíncrona
@@ -88,8 +80,7 @@ class AsyncDNSResolver:
 
             # Execute async query with timeout
             raw_result = await asyncio.wait_for(
-                resolver_method(qname),
-                timeout=self.timeout * self.tries
+                resolver_method(qname), timeout=self.timeout * self.tries
             )
 
             # Parse results
@@ -118,18 +109,18 @@ class AsyncDNSResolver:
     def _get_resolver_method(self, qtype: str):
         """Retorna o método apropriado do aiodns para o tipo de query"""
         methods = {
-            'A': self.resolver.query,
-            'AAAA': self.resolver.query,
-            'MX': self.resolver.query,
-            'CNAME': self.resolver.query,
-            'TXT': self.resolver.query,
-            'NS': self.resolver.query,
-            'SOA': self.resolver.query,
-            'SRV': self.resolver.query,
+            "A": self.resolver.query,
+            "AAAA": self.resolver.query,
+            "MX": self.resolver.query,
+            "CNAME": self.resolver.query,
+            "TXT": self.resolver.query,
+            "NS": self.resolver.query,
+            "SOA": self.resolver.query,
+            "SRV": self.resolver.query,
         }
 
         method = methods.get(qtype)
-        if method and qtype in ['A', 'AAAA', 'MX', 'CNAME', 'TXT', 'NS', 'SOA', 'SRV']:
+        if method and qtype in ["A", "AAAA", "MX", "CNAME", "TXT", "NS", "SOA", "SRV"]:
             # aiodns.query aceita qtype como argumento
             return lambda host: method(host, qtype)
 
@@ -157,83 +148,82 @@ class AsyncDNSResolver:
     def _parse_single_record(self, record, qtype: str) -> DNSAnswer | None:
         """Parse um único record baseado no tipo"""
 
-        if qtype == 'A':
+        if qtype == "A":
             return DNSAnswer(
                 host=record.host,
-                ttl=record.ttl if hasattr(record, 'ttl') else 300,
-                address=record.host
+                ttl=record.ttl if hasattr(record, "ttl") else 300,
+                address=record.host,
             )
 
-        elif qtype == 'AAAA':
+        elif qtype == "AAAA":
             return DNSAnswer(
                 host=record.host,
-                ttl=record.ttl if hasattr(record, 'ttl') else 300,
-                address=record.host
+                ttl=record.ttl if hasattr(record, "ttl") else 300,
+                address=record.host,
             )
 
-        elif qtype == 'MX':
+        elif qtype == "MX":
             return DNSAnswer(
                 host=record.host,
-                ttl=record.ttl if hasattr(record, 'ttl') else 300,
+                ttl=record.ttl if hasattr(record, "ttl") else 300,
                 exchange=record.host,
                 preference=record.priority,
-                priority=record.priority
+                priority=record.priority,
             )
 
-        elif qtype == 'CNAME':
+        elif qtype == "CNAME":
             return DNSAnswer(
-                host=record.cname if hasattr(record, 'cname') else record.host,
-                ttl=record.ttl if hasattr(record, 'ttl') else 300,
-                target=record.cname if hasattr(record, 'cname') else record.host
+                host=record.cname if hasattr(record, "cname") else record.host,
+                ttl=record.ttl if hasattr(record, "ttl") else 300,
+                target=record.cname if hasattr(record, "cname") else record.host,
             )
 
-        elif qtype == 'TXT':
+        elif qtype == "TXT":
             # aiodns retorna TXT como lista de strings
-            text_data = record.text if hasattr(record, 'text') else str(record)
+            text_data = record.text if hasattr(record, "text") else str(record)
             return DNSAnswer(
-                host='',
-                ttl=record.ttl if hasattr(record, 'ttl') else 300,
+                host="",
+                ttl=record.ttl if hasattr(record, "ttl") else 300,
                 text=text_data,
-                strings=[text_data.encode()] if isinstance(text_data, str) else [text_data]
+                strings=[text_data.encode()]
+                if isinstance(text_data, str)
+                else [text_data],
             )
 
-        elif qtype == 'NS':
+        elif qtype == "NS":
             return DNSAnswer(
                 host=record.host,
-                ttl=record.ttl if hasattr(record, 'ttl') else 300,
-                target=record.host
+                ttl=record.ttl if hasattr(record, "ttl") else 300,
+                target=record.host,
             )
 
-        elif qtype == 'SOA':
+        elif qtype == "SOA":
             return DNSAnswer(
-                host='',
-                ttl=record.ttl if hasattr(record, 'ttl') else 3600,
+                host="",
+                ttl=record.ttl if hasattr(record, "ttl") else 3600,
                 mname=record.nsname,
                 rname=record.hostmaster,
                 serial=record.serial,
                 refresh=record.refresh,
                 retry=record.retry,
                 expire=record.expire,
-                minimum=record.minttl
+                minimum=record.minttl,
             )
 
-        elif qtype == 'SRV':
+        elif qtype == "SRV":
             return DNSAnswer(
                 host=record.host,
-                ttl=record.ttl if hasattr(record, 'ttl') else 300,
+                ttl=record.ttl if hasattr(record, "ttl") else 300,
                 target=record.host,
                 port=record.port,
                 weight=record.weight,
-                priority=record.priority
+                priority=record.priority,
             )
 
         return None
 
     def _handle_dns_error(
-        self,
-        qname: str,
-        qtype: str,
-        error: aiodns.error.DNSError
+        self, qname: str, qtype: str, error: aiodns.error.DNSError
     ) -> tuple[None, DNSResolutionStatus]:
         """Mapeia erros do aiodns para DNSResolutionStatus"""
 

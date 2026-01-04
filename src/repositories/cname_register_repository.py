@@ -8,5 +8,6 @@ from src.repositories._base import BaseRepository
 
 class CNAME_RegisterRepository(BaseRepository[CNAME_Register]):
     """Repository para registros CNAME"""
+
     def __init__(self, session: AsyncSession):
         super().__init__(session, CNAME_Register)

@@ -8,5 +8,6 @@ from src.repositories._base import BaseRepository
 
 class TXT_RegisterRepository(BaseRepository[TXT_Register]):
     """Repository para registros TXT"""
+
     def __init__(self, session: AsyncSession):
         super().__init__(session, TXT_Register)

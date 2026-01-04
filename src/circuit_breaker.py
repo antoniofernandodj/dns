@@ -125,9 +125,7 @@ class CircuitBreaker:
 
     def _should_attempt_reset(self) -> bool:
         """Verifica se deve tentar resetar o circuito"""
-        return (
-            time.time() - self._stats.last_failure_time
-        ) >= self.timeout_duration
+        return (time.time() - self._stats.last_failure_time) >= self.timeout_duration
 
     async def reset(self):
         """Reseta o circuit breaker manualmente"""

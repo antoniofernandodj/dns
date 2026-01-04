@@ -8,5 +8,6 @@ from src.repositories._base import BaseRepository
 
 class SRV_RegisterRepository(BaseRepository[SRV_Register]):
     """Repository para registros SRV"""
+
     def __init__(self, session: AsyncSession):
         super().__init__(session, SRV_Register)

@@ -17,7 +17,6 @@ class DNSSECValidator:
         self.resolver = dns.resolver.Resolver()
         self.resolver.use_edns(0, dns.flags.DO, 4096)  # Enable DNSSEC
 
-
         # Cache de chaves públicas validadas para evitar revalidação
         self._validated_keys: set[str] = set()
 
@@ -99,8 +98,7 @@ class DNSSECValidator:
                 # 1. Busca DNSKEY da zona atual
                 try:
                     dnskey_rrset = self.resolver.resolve(
-                        current_name,
-                        dns.rdatatype.DNSKEY
+                        current_name, dns.rdatatype.DNSKEY
                     ).rrset
                 except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
                     logger.debug(f"No DNSKEY for zone: {zone_str}")
@@ -111,14 +109,13 @@ class DNSSECValidator:
                 # 2. Busca RRSIG do DNSKEY
                 try:
                     rrsig_rrset = self.resolver.resolve(
-                        current_name,
-                        dns.rdatatype.RRSIG,
-                        rdclass=dns.rdataclass.IN
+                        current_name, dns.rdatatype.RRSIG, rdclass=dns.rdataclass.IN
                     )
 
                     # Filtra RRSIG que cobre DNSKEY
                     dnskey_rrsigs = [
-                        rr for rr in rrsig_rrset
+                        rr
+                        for rr in rrsig_rrset
                         if rr.type_covered == dns.rdatatype.DNSKEY
                     ]
 
@@ -134,7 +131,8 @@ class DNSSECValidator:
                 try:
                     # Encontra a KSK (Key Signing Key - flags=257)
                     ksk_keys = [
-                        key for key in dnskey_rrset
+                        key
+                        for key in dnskey_rrset
                         if key.flags & 0x0001  # SEP bit (Secure Entry Point)
                     ]
 
@@ -147,7 +145,7 @@ class DNSSECValidator:
                         dnskey_rrset,
                         {current_name: dnskey_rrset},  # Use DNSKEY to validate itself
                         None,  # No timestamp validation
-                        None
+                        None,
                     )
 
                     logger.debug(f"DNSKEY self-signature validated for {zone_str}")
@@ -162,8 +160,7 @@ class DNSSECValidator:
 
                     try:
                         ds_rrset = self.resolver.resolve(
-                            current_name,
-                            dns.rdatatype.DS
+                            current_name, dns.rdatatype.DS
                         ).rrset
 
                         # Verifica que algum DS corresponde a alguma DNSKEY
@@ -172,9 +169,7 @@ class DNSSECValidator:
                             for dnskey in dnskey_rrset:
                                 # Calcula hash da DNSKEY
                                 calculated_ds = dns.dnssec.make_ds(
-                                    current_name,
-                                    dnskey,
-                                    ds.digest_type
+                                    current_name, dnskey, ds.digest_type
                                 )
 
                                 if calculated_ds.digest == ds.digest:
@@ -220,8 +215,7 @@ class DNSSECValidator:
         try:
             # Busca DNSKEY da root
             dnskey_rrset = self.resolver.resolve(
-                dns.name.root,
-                dns.rdatatype.DNSKEY
+                dns.name.root, dns.rdatatype.DNSKEY
             ).rrset
 
             # Verifica se alguma DNSKEY corresponde ao trust anchor

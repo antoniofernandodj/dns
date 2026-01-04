@@ -19,8 +19,6 @@ Esses modelos cumprem três papéis fundamentais:
 #     # DNSLabel,
 # )
 
-
-
 from dnslib import (
     AAAA,
     CNAME,
@@ -295,7 +293,7 @@ class A_Register(Base):
             return False, "IP cannot be empty"
 
         # Validação simples de IPv4 (não depende de libs externas)
-        parts = self.ip.split('.')
+        parts = self.ip.split(".")
         if len(parts) != 4:
             return False, "Invalid IPv4 format"
 
@@ -320,6 +318,7 @@ class AAAA_Register(Base):
     - Normalmente consultado em conjunto com A (dual-stack)
     - Pode coexistir com A para o mesmo host
     """
+
     def __init__(self, _id: int | None, _host: str, _ip: str) -> None:
         self.id = _id
         self.host = _host
@@ -332,11 +331,7 @@ class AAAA_Register(Base):
     @classmethod
     def from_rr(cls, rr: RR) -> "AAAA_Register":
         """Cria instância a partir de Resource Record"""
-        return cls(
-            _id=None,
-            _host=str(rr.rname) if rr.rname else "",
-            _ip=str(rr.rdata)
-        )
+        return cls(_id=None, _host=str(rr.rname) if rr.rname else "", _ip=str(rr.rdata))
 
     def validate(self) -> tuple[bool, str]:
         # Validação básica: IPv6 sempre contém ':'
@@ -346,7 +341,7 @@ class AAAA_Register(Base):
             return False, "IP cannot be empty"
 
         # Validação básica de IPv6 (aceita formato comprimido)
-        if ':' not in self.ip:
+        if ":" not in self.ip:
             return False, "Invalid IPv6 format"
 
         return True, ""
@@ -370,11 +365,7 @@ class MX_Register(Base):
     """
 
     def __init__(
-        self,
-        _id: int | None,
-        _host: str,
-        _exchange: str,
-        _preference: int
+        self, _id: int | None, _host: str, _exchange: str, _preference: int
     ) -> None:
         self.id = _id
         self.host = _host
@@ -427,24 +418,15 @@ class CNAME_Register(Base):
     - Um CNAME NÃO pode coexistir com outros registros no mesmo nome
     - A resolução continua até chegar em um registro final (A/AAAA/etc.)
     """
-    def __init__(
-        self,
-        _id: int | None,
-        _host: str,
-        _canonical_name: str
-    ) -> None:
+
+    def __init__(self, _id: int | None, _host: str, _canonical_name: str) -> None:
         self.id = _id
         self.host = _host
         self.canonical_name = _canonical_name
 
     def to_rr(self, ttl: int) -> RR:
         """Converte para Resource Record da dnslib"""
-        return RR(
-            self.host,
-            QTYPE.CNAME,
-            ttl=ttl,
-            rdata=CNAME(self.canonical_name)
-        )
+        return RR(self.host, QTYPE.CNAME, ttl=ttl, rdata=CNAME(self.canonical_name))
 
     @classmethod
     def from_rr(cls, rr: RR) -> "CNAME_Register":
@@ -452,7 +434,7 @@ class CNAME_Register(Base):
         return cls(
             _id=None,
             _host=str(rr.rname) if rr.rname else "",
-            _canonical_name=str(rr.rdata.label)  # type: ignore
+            _canonical_name=str(rr.rdata.label),  # type: ignore
         )
 
     def validate(self) -> tuple[bool, str]:
@@ -487,6 +469,7 @@ class TXT_Register(Base):
     - Normalmente consumido por aplicações, não por usuários finais
     - Pode coexistir com praticamente qualquer outro tipo de registro
     """
+
     def __init__(self, _id: int | None, _host: str, _text: str) -> None:
         self.id = _id
         self.host = _host
@@ -520,11 +503,7 @@ class TXT_Register(Base):
 
         text = "".join(text_parts)
 
-        return cls(
-            _id=None,
-            _host=str(rr.rname) if rr.rname else "",
-            _text=text
-        )
+        return cls(_id=None, _host=str(rr.rname) if rr.rname else "", _text=text)
 
     def validate(self) -> tuple[bool, str]:
         """
@@ -561,12 +540,7 @@ class NS_Register(Base):
     - Usado por resolvers para descobrir quem responde pela zona
     """
 
-    def __init__(
-        self,
-        _id: int | None,
-        _host: str,
-        _nameserver: str
-    ) -> None:
+    def __init__(self, _id: int | None, _host: str, _nameserver: str) -> None:
         self.id = _id
         self.host = _host
         self.nameserver = _nameserver
@@ -581,7 +555,7 @@ class NS_Register(Base):
         return cls(
             _id=None,
             _host=str(rr.rname) if rr.rname else "",
-            _nameserver=str(rr.rdata.label)  # type: ignore
+            _nameserver=str(rr.rdata.label),  # type: ignore
         )
 
     def validate(self) -> tuple[bool, str]:
