@@ -137,7 +137,7 @@ class DNSSECValidator:
                 # 3. Valida RRSIG com DNSKEY (self-signed)
                 try:
                     if not dnskey_rrset:
-                        raise ValueError('`dnskey_rrset` is None')
+                        raise ValueError("`dnskey_rrset` is None")
 
                     # Encontra a KSK (Key Signing Key - flags=257)
                     ksk_keys = [
@@ -153,9 +153,9 @@ class DNSSECValidator:
                     # Valida a assinatura
                     dns.dnssec.validate(
                         dnskey_rrset,
-                        # Use DNSKEY to validate itself 
+                        # Use DNSKEY to validate itself
                         {current_name: dnskey_rrset},  # type: ignore
-                        # No timestamp validation  
+                        # No timestamp validation
                         None,  # type: ignore
                         None,
                     )
@@ -174,7 +174,7 @@ class DNSSECValidator:
                         # Verifica que algum DS corresponde a alguma DNSKEY
                         ds_matched = False
                         args = (current_name, dns.rdatatype.DS)
-                        if (ds_rrset := self.resolver.resolve(*args).rrset):
+                        if ds_rrset := self.resolver.resolve(*args).rrset:
                             for ds in ds_rrset:
                                 if not dnskey_rrset:
                                     continue

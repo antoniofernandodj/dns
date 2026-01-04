@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 QTypeLiteral = Literal["A", "AAAA", "MX", "CNAME", "TXT", "NS", "SOA", "SRV"]
 
+
 @dataclass
 class DNSAnswer:
     """Wrapper para respostas DNS assíncronas"""
