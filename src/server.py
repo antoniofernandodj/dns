@@ -13,246 +13,50 @@ Responsabilidades principais:
 
 import asyncio
 import logging
-import time
-from dataclasses import dataclass, field
-from typing import Any, Callable
+import sys
+from traceback import print_exc
+from typing import Any, Callable, Dict, Optional
 
-from dnslib import QTYPE, RR, DNSQuestion, DNSRecord  # , DNSLabel
+from dnslib import (  # , DNSLabel
+    AAAA,
+    CNAME,
+    MX,
+    NS,
+    QTYPE,
+    RR,
+    SOA,
+    SRV,
+    TXT,
+    A,
+    DNSQuestion,
+    DNSRecord,
+)
 
+from consts import DNSResolutionStatus
+
+# Imports do projeto original
+from security_validator import DNSSecurityValidator
+from src.async_dns_resolver import AsyncDNSResolver, QTypeLiteral
 from src.cache_lru import LRUCache
-from src.config import load_config
+from src.circuit_breaker import CircuitBreaker
+from src.config import AppConfig, load_config
+from src.database import AsyncDatabase
+from src.dns_sec_validator import DNSSECValidator
+from src.models import (
+    A_Register,
+    AAAA_Register,
+    CNAME_Register,
+    MX_Register,
+    NS_Register,
+    SOA_Register,
+    SRV_Register,
+    TXT_Register,
+)
+from src.rate_limiter import RateLimiter
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-
-
-@dataclass
-class CacheEntry:
-    """
-    Representa uma entrada de cache DNS.
-
-    Armazena:
-    - Registro DNS (RR)
-    - TTL configurado
-    - Timestamp de criação
-    """
-
-    data: RR
-    ttl: int
-    created_at: float = field(default_factory=time.time)
-
-    def is_expired(self) -> bool:
-        """
-        Verifica se o registro expirou com base no TTL.
-
-        :return: True se expirado
-        """
-        age = time.time() - self.created_at
-        return age > self.ttl
-
-    def remaining_ttl(self) -> int:
-        """
-        Calcula o TTL restante do registro.
-
-        :return: TTL restante em segundos
-        """
-        age = int(time.time() - self.created_at)
-        remaining = self.ttl - age
-        return max(0, remaining)
-
-
-@dataclass
-class RateLimitEntry:
-    """
-    Representa o estado de rate limiting para um IP.
-
-    Controla:
-    - Quantidade de requisições
-    - Janela de tempo
-    - Período de bloqueio
-    """
-
-    request_count: int = 0
-    first_request_time: float = field(default_factory=time.time)
-    blocked_until: float = 0.0
-
-    def is_blocked(self) -> bool:
-        """
-        Verifica se o IP está bloqueado no momento.
-
-        :return: True se bloqueado
-        """
-        return time.time() < self.blocked_until
-
-    def should_reset(self, window_seconds: int) -> bool:
-        """
-        Verifica se a janela de rate limiting expirou.
-
-        :param window_seconds: Duração da janela
-        :return: True se deve resetar contadores
-        """
-        return time.time() - self.first_request_time > window_seconds
-
-
-class DNSSecurityValidator:
-    """
-    Implementa validações de segurança para queries DNS.
-
-    Protege contra:
-    - Amplification attacks
-    - Queries malformadas
-    - Domínios inválidos
-    """
-
-    MAX_QUERY_SIZE = 512  # Tamanho máximo de query DNS (UDP padrão)
-    MAX_LABEL_LENGTH = 63  # RFC 1035
-    MAX_DOMAIN_LENGTH = 253  # RFC 1035
-
-    BLOCKED_QTYPES = {
-        QTYPE.ANY,  # Bloqueia ANY queries (usado em amplification attacks)
-    }
-
-    @staticmethod
-    def validate_query_size(data: bytes) -> bool:
-        """
-        Valida o tamanho da query DNS.
-
-        :param data: Payload da query
-        :return: True se tamanho válido
-        """
-
-        return len(data) <= DNSSecurityValidator.MAX_QUERY_SIZE
-
-    @staticmethod
-    def validate_domain_name(domain: str) -> bool:
-        """
-        Valida o formato do nome de domínio conforme RFC 1035.
-
-        :param domain: Nome do domínio
-        :return: True se válido
-        """
-        if len(domain) > DNSSecurityValidator.MAX_DOMAIN_LENGTH:
-            return False
-
-        labels = domain.rstrip(".").split(".")
-        if not labels:
-            return False
-
-        for label in labels:
-            if not label or len(label) > DNSSecurityValidator.MAX_LABEL_LENGTH:
-                return False
-
-            # Verifica caracteres válidos (alfanuméricos e hífen)
-            if not all(c.isalnum() or c == "-" for c in label):
-                return False
-
-            # Label não pode começar ou terminar com hífen
-            if label.startswith("-") or label.endswith("-"):
-                return False
-
-        return True
-
-    @staticmethod
-    def is_suspicious_qtype(qtype: int) -> bool:
-        """
-        Verifica se o tipo de query é considerado suspeito.
-
-        :param qtype: Tipo DNS
-        :return: True se bloqueado
-        """
-        return qtype in DNSSecurityValidator.BLOCKED_QTYPES
-
-    @staticmethod
-    def validate_query(data: bytes, qname: str, qtype: int) -> tuple[bool, str]:
-        """
-        Executa validação completa de uma query DNS.
-
-        :return: (is_valid, mensagem_de_erro)
-        """
-        if not DNSSecurityValidator.validate_query_size(data):
-            return False, "Query size exceeds maximum"
-
-        if not DNSSecurityValidator.validate_domain_name(qname):
-            return False, "Invalid domain name format"
-
-        if DNSSecurityValidator.is_suspicious_qtype(qtype):
-            return False, f"Query type {qtype} is blocked"
-
-        return True, ""
-
-
-class RateLimiter:
-    """
-    Implementa rate limiting por IP usando sliding window.
-
-    Funcionalidades:
-    - Limita número de requisições por IP
-    - Bloqueia IPs abusivos temporariamente
-    """
-
-    def __init__(
-        self,
-        max_requests: int = 100,
-        window_seconds: int = 60,
-        block_duration: int = 300,
-    ):
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self.block_duration = block_duration
-        self.clients = LRUCache[str, RateLimitEntry]()
-        self._cleanup_task: asyncio.Task | None = None
-
-    def check_rate_limit(self, client_ip: str) -> tuple[bool, str]:
-        """
-        Verifica se um IP pode realizar a requisição.
-
-        :param client_ip: Endereço IP do cliente
-        :return: (permitido, mensagem)
-        """
-        current_time = time.time()
-
-        # Cria entrada se não existir
-        if client_ip not in self.clients:
-            self.clients[client_ip] = RateLimitEntry()
-
-        entry = self.clients[client_ip]
-
-        # Verifica se está bloqueado
-        if entry.is_blocked():
-            remaining = int(entry.blocked_until - current_time)
-            return False, f"Rate limit exceeded. Blocked for {remaining}s"
-
-        # Reset se a janela passou
-        if entry.should_reset(self.window_seconds):
-            entry.request_count = 0
-            entry.first_request_time = current_time
-
-        # Incrementa contador
-        entry.request_count += 1
-
-        # Verifica limite
-        if entry.request_count > self.max_requests:
-            entry.blocked_until = current_time + self.block_duration
-            logging.warning(
-                f"IP {client_ip} exceeded rate limit "
-                f"({entry.request_count} requests in {self.window_seconds}s). "
-                f"Blocked for {self.block_duration}s"
-            )
-            return False, f"Rate limit exceeded. Blocked for {self.block_duration}s"
-
-        return True, ""
-
-    def get_stats(self) -> dict[str, Any]:
-        """
-        Retorna estatísticas atuais do rate limiter.
-        """
-        blocked = sum(1 for entry in self.clients.values() if entry.is_blocked())
-        return {
-            "total_clients": len(self.clients),
-            "blocked_clients": blocked,
-            "active_clients": len(self.clients) - blocked,
-        }
 
 
 class DNSServer:
@@ -441,3 +245,374 @@ class DNSServer:
                 )
 
         return DNSProtocol(self)
+
+
+class DatabaseBackedDNSServer(DNSServer):
+    """
+    Servidor DNS que estende o DNSServer base adicionando:
+
+    - Cache LRU em memória
+    - Persistência em banco de dados assíncrono
+    - Resolução externa protegida por Circuit Breaker
+    - Validação DNSSEC opcional
+
+    Hierarquia de resolução:
+        Cache → Banco de Dados → DNS Externo
+    """
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        max_requests_per_minute: int,
+        cache_cleanup_interval: int,
+        circuit_breaker: CircuitBreaker,
+        dnssec_validator: DNSSECValidator,
+        config: AppConfig,
+        db: AsyncDatabase,
+    ):
+        """
+        Inicializa o servidor DNS com dependências adicionais.
+
+        :param host: Endereço IP de bind do servidor
+        :param port: Porta UDP/TCP do DNS
+        :param max_requests_per_minute: Limite de requisições por IP
+        :param cache_cleanup_interval: Intervalo de limpeza do cache
+        :param circuit_breaker: Circuit breaker para queries externas
+        :param dnssec_validator: Validador DNSSEC
+        :param config: Configuração global da aplicação
+        :param db: Instância do banco de dados assíncrono
+        """
+        super().__init__(
+            host=host,
+            port=port,
+            max_requests_per_minute=max_requests_per_minute,
+            cache_cleanup_interval=cache_cleanup_interval,
+        )
+
+        self.config = config
+        self.circuit_breaker = circuit_breaker
+        self.dnssec_validator = dnssec_validator
+        self.db = db
+        self._logger: Optional[logging.Logger] = None
+
+    @property
+    def logger(self):
+        if self._logger is None:
+            self._logger = self.setup_logging()
+        return self._logger
+
+    # Configuração de logging
+    def setup_logging(self):
+        """
+        Configura o sistema de logging da aplicação.
+
+        A configuração é baseada nos parâmetros definidos no AppConfig,
+        incluindo nível de log, formato e destino (stdout e/ou arquivo).
+
+        :param config: Configuração global da aplicação
+        """
+        logger = logging.getLogger(__name__)
+        logging.basicConfig(
+            level=getattr(logging, self.config.logging.level),
+            format=self.config.logging.format,
+            handlers=[
+                logging.StreamHandler(sys.stdout),
+                *(
+                    [logging.FileHandler(self.config.logging.file)]
+                    if self.config.logging.file
+                    else []
+                ),
+            ],
+        )
+        return logger
+
+    async def query_with_db(
+        self, qname_str: str, qtype: int, response: DNSRecord, cache: LRUCache, ttl: int
+    ) -> bool:
+        """
+        Executa uma query DNS utilizando fallback hierárquico.
+
+        Ordem:
+            1. Cache em memória
+            2. Banco de dados
+            3. Resolução DNS externa
+
+        :param qname_str: Nome do host consultado
+        :param qtype: Tipo do registro DNS (QTYPE)
+        :param response: Objeto DNSRecord de resposta
+        :param cache: Cache LRU compartilhado
+        :param ttl: TTL aplicado ao registro
+        :return: True se a resolução teve sucesso
+        """
+
+        # 1. Cache
+        cached_rr = await cache.get(qname_str, qtype)
+        if cached_rr:
+            response.add_answer(cached_rr)
+            return True
+
+        # 2. Banco de dados
+        db_result = await self._query_database(qname_str, qtype, ttl)
+        if db_result:
+            for rr in db_result:
+                response.add_answer(rr)
+                await cache.set(qname_str, qtype, rr, ttl)
+
+            logging.info(f"DB HIT: {qname_str} ({qtype})")
+            return True
+
+        # 3. Resolução externa
+        return await self._query_external(qname_str, qtype, response, ttl)
+
+    async def _query_database(
+        self, qname_str: str, qtype: int, ttl: int
+    ) -> list[RR] | None:
+        """
+        Consulta o banco de dados em busca de registros DNS.
+
+        A consulta é executada de forma assíncrona utilizando
+        repositórios específicos por tipo de registro.
+
+        :param qname_str: Hostname consultado
+        :param qtype: Tipo do registro DNS
+        :param ttl: TTL aplicado ao RR
+        :return: Lista de RR ou None
+        """
+        try:
+            async with self.db.repository_factory() as factory:
+                if qtype == QTYPE.A:
+                    register = await factory.a_repository.get_by_hostname(qname_str)
+                    return [register.to_rr(ttl)] if register else None
+
+                elif qtype == QTYPE.AAAA:
+                    register = await factory.aaaa_repository.get_by_hostname(qname_str)
+                    return [register.to_rr(ttl)] if register else None
+
+                elif qtype == QTYPE.MX:
+                    registers = await factory.mx_repository.get_all_by_hostname(
+                        qname_str
+                    )
+                    return [r.to_rr(ttl) for r in registers] if registers else None
+
+                elif qtype == QTYPE.CNAME:
+                    register = await factory.cname_repository.get_by_hostname(qname_str)
+                    return [register.to_rr(ttl)] if register else None
+
+                elif qtype == QTYPE.TXT:
+                    registers = await factory.txt_repository.get_all_by_hostname(
+                        qname_str
+                    )
+                    return [r.to_rr(ttl) for r in registers] if registers else None
+
+                elif qtype == QTYPE.NS:
+                    registers = await factory.ns_repository.get_all_by_hostname(
+                        qname_str
+                    )
+                    return [r.to_rr(ttl) for r in registers] if registers else None
+
+                elif qtype == QTYPE.SOA:
+                    register = await factory.soa_repository.get_by_hostname(qname_str)
+                    return [register.to_rr(ttl)] if register else None
+
+                elif qtype == QTYPE.SRV:
+                    registers = await factory.srv_repository.get_all_by_hostname(
+                        qname_str
+                    )
+                    return [r.to_rr(ttl) for r in registers] if registers else None
+
+                return None
+        except Exception as e:
+            print_exc()
+            logging.error(f"Database query error for {qname_str}: {e}")
+            return None
+
+    def _handle_dns_error(self, response: DNSRecord, status: DNSResolutionStatus):
+        """
+        Ajusta o código de erro DNS (RCODE) baseado
+        no status da resolução externa.
+
+        :param response: Objeto DNSRecord de resposta
+        :param status: Status da resolução DNS
+        """
+        if status == DNSResolutionStatus.NXDOMAIN:
+            response.header.rcode = 3
+        elif status in [
+            DNSResolutionStatus.TIMEOUT,
+            DNSResolutionStatus.NO_NAMESERVERS,
+        ]:
+            response.header.rcode = 2
+        else:
+            response.header.rcode = 2
+
+    async def _query_external(
+        self, qname_str: str, qtype: int, response: DNSRecord, ttl: int
+    ) -> bool:
+        """
+        Executa resolução DNS externa utilizando Circuit Breaker.
+
+        Também realiza validação DNSSEC, se habilitada, e persiste
+        os resultados no banco e cache.
+
+        :param qname_str: Hostname consultado
+        :param qtype: Tipo do registro DNS
+        :param response: Objeto DNSRecord de resposta
+        :param ttl: TTL aplicado ao registro
+        :return: True se a resolução foi bem-sucedida
+        """
+        qtype_map: Dict[Any, QTypeLiteral] = {
+            QTYPE.A: "A",
+            QTYPE.AAAA: "AAAA",
+            QTYPE.MX: "MX",
+            QTYPE.CNAME: "CNAME",
+            QTYPE.TXT: "TXT",
+            QTYPE.NS: "NS",
+            QTYPE.SOA: "SOA",
+            QTYPE.SRV: "SRV",
+        }
+
+        qtype_str = qtype_map.get(qtype)
+        if not qtype_str:
+            return False
+
+        # Executa query através do circuit breaker
+        async def external_query():
+            resolver = AsyncDNSResolver(
+                nameservers=self.config.dns.upstream_servers, timeout=5.0, tries=2
+            )
+
+            return await resolver.resolve(qname=qname_str, qtype=qtype_str)
+
+        try:
+            answers, status = await self.circuit_breaker.call(external_query)
+
+            if status != DNSResolutionStatus.SUCCESS or not answers:
+                self._handle_dns_error(response, status)
+                return False
+
+            # DNSSEC validation se habilitado
+            if self.config.security.validate_dnssec:
+                is_valid, error = await self.dnssec_validator.validate_response(
+                    qname_str, qtype_str
+                )
+
+                if not is_valid:
+                    self.logger.warning(
+                        f"DNSSEC validation failed for {qname_str}: {error}"
+                    )
+                    response.header.rcode = 2  # SERVFAIL
+                    return False
+
+            await self._save_to_database(qname_str, qtype, answers, response, ttl)
+            return True
+
+        except Exception as e:
+            print_exc()
+            logging.error(f"External query error for {qname_str}: {e}")
+            response.header.rcode = 2  # SERVFAIL
+            return False
+
+    async def _save_to_database(
+        self, qname_str: str, qtype: int, answers, response: DNSRecord, ttl: int
+    ) -> None:
+        """
+        Persiste os registros DNS no banco de dados,
+        adiciona à resposta e armazena no cache.
+
+        :param qname_str: Hostname resolvido
+        :param qtype: Tipo do registro DNS
+        :param answers: Respostas retornadas pelo resolver externo
+        :param response: Objeto DNSRecord de resposta
+        :param ttl: TTL aplicado aos registros
+        """
+
+        try:
+            async with self.db.repository_factory() as factory:
+                for answer in answers:
+                    rr = None
+
+                    if qtype == QTYPE.A:
+                        ip = str(answer.address)
+                        rr = RR(qname_str, QTYPE.A, ttl=ttl, rdata=A(ip))
+                        e1 = A_Register.from_rr(rr)
+                        await factory.a_repository.save(e1)
+
+                    elif qtype == QTYPE.AAAA:
+                        ip = str(answer.address)
+                        rr = RR(qname_str, QTYPE.AAAA, ttl=ttl, rdata=AAAA(ip))
+                        e2 = AAAA_Register.from_rr(rr)
+                        await factory.aaaa_repository.save(e2)
+
+                    elif qtype == QTYPE.MX:
+                        exchange = str(answer.exchange)
+                        pref = int(answer.preference)
+                        rr = RR(qname_str, QTYPE.MX, ttl=ttl, rdata=MX(exchange, pref))
+                        e3 = MX_Register.from_rr(rr)
+                        await factory.mx_repository.save(e3)
+
+                    elif qtype == QTYPE.CNAME:
+                        cname = str(answer.target)
+                        rr = RR(qname_str, QTYPE.CNAME, ttl=ttl, rdata=CNAME(cname))
+                        e4 = CNAME_Register.from_rr(rr)
+                        await factory.cname_repository.save(e4)
+
+                    elif qtype == QTYPE.TXT:
+                        txt_parts = [
+                            s.decode("utf-8") if isinstance(s, bytes) else str(s)
+                            for s in answer.strings
+                        ]
+                        txt = "".join(txt_parts)
+                        rr = RR(qname_str, QTYPE.TXT, ttl=ttl, rdata=TXT(txt))
+                        e5 = TXT_Register.from_rr(rr)
+                        await factory.txt_repository.save(e5)
+
+                    elif qtype == QTYPE.NS:
+                        ns = str(answer.target)
+                        rr = RR(qname_str, QTYPE.NS, ttl=ttl, rdata=NS(ns))
+                        e6 = NS_Register.from_rr(rr)
+                        await factory.ns_repository.save(e6)
+
+                    elif qtype == QTYPE.SOA:
+                        rr = RR(
+                            qname_str,
+                            QTYPE.SOA,
+                            ttl=ttl,
+                            rdata=SOA(
+                                mname=str(answer.mname),
+                                rname=str(answer.rname),
+                                times=(
+                                    answer.serial,
+                                    answer.refresh,
+                                    answer.retry,
+                                    answer.expire,
+                                    answer.minimum,
+                                ),
+                            ),
+                        )
+                        e7 = SOA_Register.from_rr(rr)
+                        await factory.soa_repository.save(e7)
+
+                    elif qtype == QTYPE.SRV:
+                        rr = RR(
+                            qname_str,
+                            QTYPE.SRV,
+                            ttl=ttl,
+                            rdata=SRV(
+                                target=str(answer.target),
+                                port=answer.port,
+                                weight=answer.weight,
+                                priority=answer.priority,
+                            ),
+                        )
+                        e8 = SRV_Register.from_rr(rr)
+                        await factory.srv_repository.save(e8)
+
+                    if rr:
+                        response.add_answer(rr)
+                        await self.cache.set(
+                            qname=qname_str, qtype=qtype, data=rr, ttl=ttl
+                        )
+                        logging.info(f"Saved to DB: {qname_str} ({qtype})")
+
+        except Exception as e:
+            logging.error(f"Failed to save to database: {e}")

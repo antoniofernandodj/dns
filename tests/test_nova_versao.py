@@ -13,7 +13,7 @@ sys.path.insert(0, ".")
 
 from dnslib import QTYPE, RR, A
 
-from server import CacheEntry, DNSSecurityValidator, RateLimiter
+from server import DNSSecurityValidator, RateLimiter
 from src.cache_lru import LRUCache
 
 # ============================================================================
@@ -249,15 +249,6 @@ def test_type_hints():
     print("=" * 70)
 
     import inspect
-
-    # Verifica CacheEntry
-    sig = inspect.signature(CacheEntry.is_expired)
-    assert sig.return_annotation is bool, "❌ is_expired deveria retornar bool"
-    print("✅ CacheEntry.is_expired tem type hint correto")
-
-    sig = inspect.signature(CacheEntry.remaining_ttl)
-    assert sig.return_annotation is int, "❌ remaining_ttl deveria retornar int"
-    print("✅ CacheEntry.remaining_ttl tem type hint correto")
 
     # Verifica LRUCache
     sig = inspect.signature(LRUCache.get)
