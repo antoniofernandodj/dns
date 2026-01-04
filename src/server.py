@@ -401,11 +401,8 @@ class DNSServer:
         # Cria socket UDP
         loop = asyncio.get_running_loop()
 
-        transport, protocol = (
-            await loop.create_datagram_endpoint(
-                self.create_protocol,
-                local_addr=self.s
-            )
+        transport, protocol = await loop.create_datagram_endpoint(
+            self.create_protocol, local_addr=self.s
         )
 
         logging.info(f"DNS server running on {self.s}")
@@ -422,9 +419,8 @@ class DNSServer:
             logging.info("Shutting down DNS server...")
         finally:
             transport.close()
-    
-    def create_protocol(self):
 
+    def create_protocol(self):
         class DNSProtocol(asyncio.DatagramProtocol):
             """
             Protocolo UDP responsável por receber datagramas DNS
@@ -445,5 +441,3 @@ class DNSServer:
                 )
 
         return DNSProtocol(self)
-
-

@@ -400,7 +400,9 @@ class DatabaseBackedDNSServer(DNSServer):
 
                     if rr:
                         response.add_answer(rr)
-                        await self.cache.set(qname=qname_str, qtype=qtype, data=rr, ttl=ttl)
+                        await self.cache.set(
+                            qname=qname_str, qtype=qtype, data=rr, ttl=ttl
+                        )
                         logging.info(f"Saved to DB: {qname_str} ({qtype})")
 
         except Exception as e:
