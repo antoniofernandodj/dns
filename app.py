@@ -16,14 +16,75 @@ import logging
 from dnslib import QTYPE, DNSLabel, DNSRecord
 
 from consts import LONG_TTL, MEDIUM_TTL, TTL
-
-# Imports do projeto original
-from src.cache_lru import LRUCache
 from src.circuit_breaker import CircuitBreaker
 from src.config import load_config
 from src.database import AsyncDatabase
 from src.dns_sec_validator import DNSSECValidator
 from src.server import DatabaseBackedDNSServer
+
+config = load_config()
+db = AsyncDatabase(config.database)
+
+circuit_breaker = CircuitBreaker(
+    failure_threshold=config.circuit_breaker.failure_threshold,
+    timeout_duration=config.circuit_breaker.timeout_duration,
+    half_open_max_calls=config.circuit_breaker.half_open_max_calls,
+    name=config.name,
+)
+
+dnssec_validator = DNSSECValidator(enabled=config.security.validate_dnssec)
+
+server = DatabaseBackedDNSServer(
+    circuit_breaker=circuit_breaker,
+    host=config.server.host,
+    port=config.server.port,
+    max_requests_per_minute=config.rate_limit.max_requests,
+    cache_cleanup_interval=config.cache.cleanup_interval,
+    dnssec_validator=dnssec_validator,
+    config=config,
+    db=db,
+)
+
+
+@server.query(QTYPE.A)
+async def handle_a(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.A, record, TTL)
+
+
+@server.query(QTYPE.AAAA)
+async def handle_aaaa(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.AAAA, record, TTL)
+
+
+@server.query(QTYPE.MX)
+async def handle_mx(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.MX, record, MEDIUM_TTL)
+
+
+@server.query(QTYPE.CNAME)
+async def handle_cname(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.CNAME, record, TTL)
+
+
+@server.query(QTYPE.TXT)
+async def handle_txt(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.TXT, record, LONG_TTL)
+
+
+@server.query(QTYPE.NS)
+async def handle_ns(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.NS, record, LONG_TTL)
+
+
+@server.query(QTYPE.SOA)
+async def handle_soa(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.SOA, record, LONG_TTL)
+
+
+@server.query(QTYPE.SRV)
+async def handle_srv(qname: DNSLabel, record: DNSRecord):
+    await server.query_with_db(qname, QTYPE.SRV, record, LONG_TTL)
+
 
 
 async def main():
@@ -38,144 +99,11 @@ async def main():
     - Iniciar o servidor DNS
     """
 
-    logging.info("Database initialized")
-    config = load_config()
-    db = AsyncDatabase(config.database)
-    await db.init_db()
-
-    circuit_breaker = CircuitBreaker(
-        failure_threshold=config.circuit_breaker.failure_threshold,
-        timeout_duration=config.circuit_breaker.timeout_duration,
-        half_open_max_calls=config.circuit_breaker.half_open_max_calls,
-        name="DNS_External",
-    )
-
-    dnssec_validator = DNSSECValidator(enabled=config.security.validate_dnssec)
-
-    server = DatabaseBackedDNSServer(
-        circuit_breaker=circuit_breaker,
-        host="127.0.0.1",
-        port=53,
-        max_requests_per_minute=10000,
-        cache_cleanup_interval=60,
-        dnssec_validator=dnssec_validator,
-        config=config,
-        db=db,
-    )
-
     server.setup_logging()
 
-    @server.query(QTYPE.A)
-    async def handle_a(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.A,
-            response=record,
-            cache=cache,
-            ttl=TTL,
-        )
+    logging.info("Database initialized")
 
-    @server.query(QTYPE.AAAA)
-    async def handle_aaaa(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.AAAA,
-            response=record,
-            cache=cache,
-            ttl=TTL,
-        )
-
-    @server.query(QTYPE.MX)
-    async def handle_mx(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.MX,
-            response=record,
-            cache=cache,
-            ttl=MEDIUM_TTL,
-        )
-
-    @server.query(QTYPE.CNAME)
-    async def handle_cname(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.CNAME,
-            response=record,
-            cache=cache,
-            ttl=TTL,
-        )
-
-    @server.query(QTYPE.TXT)
-    async def handle_txt(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.TXT,
-            response=record,
-            cache=cache,
-            ttl=LONG_TTL,
-        )
-
-    @server.query(QTYPE.NS)
-    async def handle_ns(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.NS,
-            response=record,
-            cache=cache,
-            ttl=LONG_TTL,
-        )
-
-    @server.query(QTYPE.SOA)
-    async def handle_soa(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.SOA,
-            response=record,
-            cache=cache,
-            ttl=LONG_TTL,
-        )
-
-    @server.query(QTYPE.SRV)
-    async def handle_srv(
-        qname: DNSLabel,
-        record: DNSRecord,
-        cache: LRUCache,
-    ):
-        await server.query_with_db(
-            qname_str=str(qname),
-            qtype=QTYPE.SRV,
-            response=record,
-            cache=cache,
-            ttl=LONG_TTL,
-        )
+    await db.init_db()
 
     logging.info("Starting DNS server with full features:")
     logging.info("  ✓ Async concurrency (asyncio)")
@@ -185,10 +113,7 @@ async def main():
     logging.info("  ✓ Database persistence")
     logging.info("  ✓ Complete type hints")
 
-    try:
-        await server.start()
-    except KeyboardInterrupt:
-        pass
+    await server.start()
 
 
 if __name__ == "__main__":

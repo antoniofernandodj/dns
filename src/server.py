@@ -15,7 +15,7 @@ import asyncio
 import logging
 import sys
 from traceback import print_exc
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 from dnslib import (  # , DNSLabel
     AAAA,
@@ -28,6 +28,7 @@ from dnslib import (  # , DNSLabel
     SRV,
     TXT,
     A,
+    DNSLabel,
     DNSQuestion,
     DNSRecord,
 )
@@ -35,7 +36,7 @@ from dnslib import (  # , DNSLabel
 from consts import DNSResolutionStatus
 
 # Imports do projeto original
-from security_validator import DNSSecurityValidator
+from src.security_validator import DNSSecurityValidator
 from src.async_dns_resolver import AsyncDNSResolver, QTypeLiteral
 from src.cache_lru import LRUCache
 from src.circuit_breaker import CircuitBreaker
@@ -173,9 +174,9 @@ class DNSServer:
 
                 # 7. Executa handler (pode ser assíncrono)
                 if asyncio.iscoroutinefunction(handler):
-                    await handler(question.qname, response, self.cache)
+                    await handler(question.qname, response)
                 else:
-                    handler(question.qname, response, self.cache)
+                    handler(question.qname, response)
 
             # 8. Envia resposta
             transport.sendto(response.pack(), addr)
@@ -328,7 +329,7 @@ class DatabaseBackedDNSServer(DNSServer):
         return logger
 
     async def query_with_db(
-        self, qname_str: str, qtype: int, response: DNSRecord, cache: LRUCache, ttl: int
+        self, qname_str: Union[DNSLabel, str], qtype: int, response: DNSRecord, ttl: int
     ) -> bool:
         """
         Executa uma query DNS utilizando fallback hierárquico.
@@ -345,9 +346,10 @@ class DatabaseBackedDNSServer(DNSServer):
         :param ttl: TTL aplicado ao registro
         :return: True se a resolução teve sucesso
         """
+        qname_str = str(qname_str)
 
         # 1. Cache
-        cached_rr = await cache.get(qname_str, qtype)
+        cached_rr = await self.cache.get(qname_str, qtype)
         if cached_rr:
             response.add_answer(cached_rr)
             return True
@@ -357,7 +359,7 @@ class DatabaseBackedDNSServer(DNSServer):
         if db_result:
             for rr in db_result:
                 response.add_answer(rr)
-                await cache.set(qname_str, qtype, rr, ttl)
+                await self.cache.set(qname_str, qtype, rr, ttl)
 
             logging.info(f"DB HIT: {qname_str} ({qtype})")
             return True

@@ -60,6 +60,7 @@ class LoggingConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
+    name: str
     server: ServerConfig
     database: DatabaseConfig
     dns: DNSConfig
