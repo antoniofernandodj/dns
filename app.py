@@ -47,42 +47,42 @@ server = DatabaseBackedDNSServer(
 
 
 @server.query(QTYPE.A)
-async def handle_a(qname: DNSLabel, record: DNSRecord):
+async def handle_a(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.A, record, TTL)
 
 
 @server.query(QTYPE.AAAA)
-async def handle_aaaa(qname: DNSLabel, record: DNSRecord):
+async def handle_aaaa(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.AAAA, record, TTL)
 
 
 @server.query(QTYPE.MX)
-async def handle_mx(qname: DNSLabel, record: DNSRecord):
+async def handle_mx(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.MX, record, MEDIUM_TTL)
 
 
 @server.query(QTYPE.CNAME)
-async def handle_cname(qname: DNSLabel, record: DNSRecord):
+async def handle_cname(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.CNAME, record, TTL)
 
 
 @server.query(QTYPE.TXT)
-async def handle_txt(qname: DNSLabel, record: DNSRecord):
+async def handle_txt(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.TXT, record, LONG_TTL)
 
 
 @server.query(QTYPE.NS)
-async def handle_ns(qname: DNSLabel, record: DNSRecord):
+async def handle_ns(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.NS, record, LONG_TTL)
 
 
 @server.query(QTYPE.SOA)
-async def handle_soa(qname: DNSLabel, record: DNSRecord):
+async def handle_soa(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.SOA, record, LONG_TTL)
 
 
 @server.query(QTYPE.SRV)
-async def handle_srv(qname: DNSLabel, record: DNSRecord):
+async def handle_srv(qname: DNSLabel, record: DNSRecord) -> None:
     await server.query_with_db(qname, QTYPE.SRV, record, LONG_TTL)
 
 
@@ -101,9 +101,8 @@ async def main():
 
     server.setup_logging()
 
-    logging.info("Database initialized")
-
     await db.init_db()
+    logging.info("Database initialized")
 
     logging.info("Starting DNS server with full features:")
     logging.info("  ✓ Async concurrency (asyncio)")
